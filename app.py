@@ -90,15 +90,22 @@ students_list = [row[0] for row in cursor.fetchall()]
 st.sidebar.subheader("🗑️ إزالة طالب")
 if students_list:
     student_to_remove = st.sidebar.selectbox(
-        "اختر الطالب المراد إزالته:", students_list, key="remove_select"
+        "اختر الطالب المراد إزالته:",
+        students_list,
+        index=None,
+        placeholder="اختر الطالب للحذف...",
+        key="remove_select",
     )
     if st.sidebar.button("حذف الطالب", type="secondary"):
-        cursor.execute(
-            "DELETE FROM students WHERE name = ?", (student_to_remove,)
-        )
-        conn.commit()
-        st.sidebar.success(f"تمت إزالة الطالب ({student_to_remove}) بنجاح!")
-        st.rerun()
+        if student_to_remove:
+            cursor.execute(
+                "DELETE FROM students WHERE name = ?", (student_to_remove,)
+            )
+            conn.commit()
+            st.sidebar.success(f"تمت إزالة الطالب ({student_to_remove}) بنجاح!")
+            st.rerun()
+        else:
+            st.sidebar.warning("يرجى اختيار طالب أولاً لإزالته.")
 else:
     st.sidebar.info("لا يوجد طلاب مضافون حالياً.")
 
@@ -118,10 +125,13 @@ else:
     # --- 1. قسم الحضور والغياب المجمع ---
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
-        
-        # تصفية سريعة لأسماء الحضور بالبحث الحرفي
-        search_att = st.text_input("🔍 تصفية أسماء كشف الحضور (اكتب حرفاً أو اسماً):", "", key="search_att")
-        filtered_att_students = [s for s in students_list if search_att.strip().lower() in s.lower()]
+
+        search_att = st.text_input(
+            "🔍 تصفية أسماء كشف الحضور (اكتب حرفاً أو اسماً):", "", key="search_att"
+        )
+        filtered_att_students = [
+            s for s in students_list if search_att.strip().lower() in s.lower()
+        ]
 
         st.caption("حدد حالة كل طالب ثم اضغط على زر الحفظ النهائي بالأسفل:")
 
@@ -158,15 +168,15 @@ else:
     # --- 2. قسم الحفظ الجديد ---
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
-        
-        # اختيار مباشر مع إمكانية البحث بالكتابة داخل المربع
+
         selected_student_hifz = st.selectbox(
-            "🔎 ابحث عن اسم الطالب أو اختره مباشر من القائمة (اكتب حرفاً لتصفية الأسماء):",
+            "🔎 ابحث عن اسم الطالب (اكتب حرفاً أو اختر مباشرة):",
             students_list,
-            index=0,
+            index=None,
+            placeholder="اضغط هنا واكتب اسم الطالب...",
             key="hifz_student_search",
         )
-        
+
         surah = st.text_input("سورة الحفظ:", "البقرة", key="hifz_surah")
         col1, col2 = st.columns(2)
         with col1:
@@ -184,37 +194,40 @@ else:
             key="hifz_rate",
         )
         if st.button("حفظ التسميع 💾", key="save_hifz"):
-            cursor.execute(
-                """
-                INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """,
-                (
-                    str(entry_date),
-                    selected_student_hifz,
-                    surah,
-                    from_ayah,
-                    to_ayah,
-                    hifz_rating,
-                ),
-            )
-            conn.commit()
-            st.success(
-                f"تم حفظ تسميع الطالب ({selected_student_hifz}) بنجاح!"
-            )
+            if selected_student_hifz is None:
+                st.error("⚠️ يرجى اختيار أو البحث عن اسم الطالب أولاً!")
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        str(entry_date),
+                        selected_student_hifz,
+                        surah,
+                        from_ayah,
+                        to_ayah,
+                        hifz_rating,
+                    ),
+                )
+                conn.commit()
+                st.success(
+                    f"تم حفظ تسميع الطالب ({selected_student_hifz}) بنجاح!"
+                )
 
     # --- 3. قسم المراجعة ---
     with tab3:
         st.markdown("### تسجيل المراجعة")
-        
-        # اختيار مباشر مع إمكانية البحث بالكتابة داخل المربع
+
         selected_student_rev = st.selectbox(
-            "🔎 ابحث عن اسم الطالب أو اختره مباشر من القائمة (اكتب حرفاً لتصفية الأسماء):",
+            "🔎 ابحث عن اسم الطالب (اكتب حرفاً أو اختر مباشرة):",
             students_list,
-            index=0,
+            index=None,
+            placeholder="اضغط هنا واكتب اسم الطالب...",
             key="rev_student_search",
         )
-        
+
         review_amount = st.text_input(
             "مقدار المراجعة:", "من سورة يس إلى الواقعة", key="rev_amount"
         )
@@ -224,20 +237,25 @@ else:
             key="rev_rate",
         )
         if st.button("حفظ المراجعة 💾", key="save_rev"):
-            cursor.execute(
-                """
-                INSERT INTO review_records (date, student_name, amount, rating)
-                VALUES (?, ?, ?, ?)
-            """,
-                (
-                    str(entry_date),
-                    selected_student_rev,
-                    review_amount,
-                    review_rating,
-                ),
-            )
-            conn.commit()
-            st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev}) بنجاح!")
+            if selected_student_rev is None:
+                st.error("⚠️ يرجى اختيار أو البحث عن اسم الطالب أولاً!")
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO review_records (date, student_name, amount, rating)
+                    VALUES (?, ?, ?, ?)
+                """,
+                    (
+                        str(entry_date),
+                        selected_student_rev,
+                        review_amount,
+                        review_rating,
+                    ),
+                )
+                conn.commit()
+                st.success(
+                    f"تم حفظ مراجعة الطالب ({selected_student_rev}) بنجاح!"
+                )
 
 # --------------------------------------------------
 # قسم تصدير واستعراض البيانات (شامل أسبوعي/شخصي)
@@ -253,37 +271,44 @@ export_mode = st.radio(
 
 if export_mode == "تصدير طالب محدد فقط (تقرير شخصي)":
     single_student = st.selectbox(
-        "🔎 اختر اسم الطالب لتنزيل ملفه الخاص (يمكنك البحث بالتنفيذ المباشر):",
+        "🔎 اختر اسم الطالب لتنزيل ملفه الخاص:",
         students_list,
+        index=None,
+        placeholder="اضغط هنا واكتب اسم الطالب...",
         key="export_single_search",
     )
 
-    df_att_single = pd.read_sql_query(
-        f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student}' ORDER BY date DESC",
-        conn,
-    )
-    df_hifz_single = pd.read_sql_query(
-        f"SELECT date AS التاريخ, student_name AS الطالب, surah AS السورة, from_ayah AS من_آية, to_ayah AS إلى_آية, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student}' ORDER BY date DESC",
-        conn,
-    )
-    df_rev_single = pd.read_sql_query(
-        f"SELECT date AS التاريخ, student_name AS الطالب, amount AS مقدار_المراجعة, rating AS التقييم FROM review_records WHERE student_name = '{single_student}' ORDER BY date DESC",
-        conn,
-    )
+    if single_student:
+        df_att_single = pd.read_sql_query(
+            f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student}' ORDER BY date DESC",
+            conn,
+        )
+        df_hifz_single = pd.read_sql_query(
+            f"SELECT date AS التاريخ, student_name AS الطالب, surah AS السورة, from_ayah AS من_آية, to_ayah AS إلى_آية, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student}' ORDER BY date DESC",
+            conn,
+        )
+        df_rev_single = pd.read_sql_query(
+            f"SELECT date AS التاريخ, student_name AS الطالب, amount AS مقدار_المراجعة, rating AS التقييم FROM review_records WHERE student_name = '{single_student}' ORDER BY date DESC",
+            conn,
+        )
 
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df_att_single.to_excel(writer, index=False, sheet_name="سجل_الحضور")
-        df_hifz_single.to_excel(writer, index=False, sheet_name="سجل_الحفظ")
-        df_rev_single.to_excel(writer, index=False, sheet_name="سجل_المراجعة")
-    excel_data = output.getvalue()
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df_att_single.to_excel(
+                writer, index=False, sheet_name="سجل_الحضور"
+            )
+            df_hifz_single.to_excel(writer, index=False, sheet_name="سجل_الحفظ")
+            df_rev_single.to_excel(
+                writer, index=False, sheet_name="سجل_المراجعة"
+            )
+        excel_data = output.getvalue()
 
-    st.download_button(
-        label=f"📥 تنزيل ملف Excel الخاص بـ ({single_student})",
-        data=excel_data,
-        file_name=f"تقرير_{single_student}_{date.today()}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+        st.download_button(
+            label=f"📥 تنزيل ملف Excel الخاص بـ ({single_student})",
+            data=excel_data,
+            file_name=f"تقرير_{single_student}_{date.today()}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
 else:
     df_att_raw = pd.read_sql_query(
