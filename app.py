@@ -53,30 +53,33 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# تنسيق الواجهة لتكون من اليمين إلى اليسار (RTL)
+# إصلاح التنسيق والمحاذاة للعربية بدون إفساد القائمة الجانبية
 # --------------------------------------------------
 st.markdown(
     """
     <style>
-    /* تطبيق الاتجاه والمحاذاة من اليمين إلى اليسار */
-    html, body, [class*="st-"], [class*="css"], div, p, span, h1, h2, h3, h4, label {
+    /* محاذاة المحتوى الرئيسي فقط من اليمين إلى اليسار */
+    .stMainBlockContainer {
         direction: rtl !important;
         text-align: right !important;
     }
     
-    /* محاذاة عناصر الأدوات والقوائم */
-    .stSelectbox, .stTextInput, .stRadio, .stButton, .stDateInput, .stNumberInput {
-        direction: rtl !important;
+    /* محاذاة النصوص والعناوين والخيارات داخل الصفحة */
+    .stMainBlockContainer div, 
+    .stMainBlockContainer p, 
+    .stMainBlockContainer label, 
+    .stMainBlockContainer h1, 
+    .stMainBlockContainer h2, 
+    .stMainBlockContainer h3 {
         text-align: right !important;
+        direction: rtl !important;
     }
 
-    /* محاذاة خيارات الراديو أفقياً وتعديل هوامشها */
-    div[data-testid="stMarkdownContainer"] > p {
-        text-align: right !important;
-    }
-    
-    /* تعديل الاتجاه للشريط الجانبي */
+    /* إصلاح القائمة الجانبية وتفادي التداخل */
     section[data-testid="stSidebar"] {
+        direction: ltr !important;
+    }
+    section[data-testid="stSidebar"] * {
         direction: rtl !important;
         text-align: right !important;
     }
@@ -206,7 +209,7 @@ else:
                 f"✅ تم حفظ حضور {len(attendance_results)} طالب بتاريخ {entry_date} بنجاح!"
             )
 
-    # --- 2. قسم الحفظ الجديد (مُعدّل للتقييم السريع فقط) ---
+    # --- 2. قسم الحفظ الجديد ---
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
 
