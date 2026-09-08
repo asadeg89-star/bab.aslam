@@ -60,8 +60,11 @@ st.set_page_config(
 )
 st.title("📖 برنامج إدارة مركز التحفيظ")
 
-# 2. القائمة الجانبية لإدارة الطلاب
-st.sidebar.header("➕ إدارة الطلاب")
+# 2. القائمة الجانبية لإدارة الطلاب (إضافة + إزالة)
+st.sidebar.header("⚙️ إدارة الطلاب")
+
+# قسم إضافة طالب
+st.sidebar.subheader("➕ إضافة طالب جديد")
 new_student = st.sidebar.text_input("اسم الطالب الجديد:")
 if st.sidebar.button("إضافة الطالب"):
     if new_student.strip() != "":
@@ -77,9 +80,31 @@ if st.sidebar.button("إضافة الطالب"):
     else:
         st.sidebar.warning("يرجى كتابة اسم الطالب.")
 
+st.sidebar.divider()
+
+# جلب قائمة الطلاب الحالية
 cursor.execute("SELECT name FROM students ORDER BY name ASC")
 students_list = [row[0] for row in cursor.fetchall()]
 
+# قسم إزالة طالب
+st.sidebar.subheader("🗑️ إزالة طالب")
+if students_list:
+    student_to_remove = st.sidebar.selectbox(
+        "اختر الطالب المراد إزالته:", students_list, key="remove_select"
+    )
+    if st.sidebar.button("حذف الطالب", type="secondary"):
+        cursor.execute(
+            "DELETE FROM students WHERE name = ?", (student_to_remove,)
+        )
+        conn.commit()
+        st.sidebar.success(f"تمت إزالة الطالب ({student_to_remove}) بنجاح!")
+        st.rerun()
+else:
+    st.sidebar.info("لا يوجد طلاب مضافون حالياً.")
+
+# --------------------------------------------------
+# الواجهة الرئيسية لتسجيل البيانات
+# --------------------------------------------------
 if not students_list:
     st.info("👈 لا يوجد طلاب مضافون بعد! قم بإضافة الطلاب من القائمة الجانبية.")
 else:
@@ -240,7 +265,6 @@ if export_mode == "تصدير طالب محدد فقط (تقرير شخصي)":
     )
 
 else:
-    # 1. تجهيز جدول الحضور الشبكي
     df_att_raw = pd.read_sql_query(
         "SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records",
         conn,
@@ -252,7 +276,6 @@ else:
     else:
         df_att_pivot = pd.DataFrame(columns=["التاريخ"])
 
-    # 2. تجهيز جدول الحفظ الشبكي
     df_hifz_raw = pd.read_sql_query(
         "SELECT date AS التاريخ, student_name AS الطالب, (surah || ' [' || from_ayah || '-' || to_ayah || '] - ' || rating) AS الحفظ FROM hifz_records",
         conn,
@@ -264,7 +287,6 @@ else:
     else:
         df_hifz_pivot = pd.DataFrame(columns=["التاريخ"])
 
-    # 3. تجهيز جدول المراجعة الشبكي
     df_rev_raw = pd.read_sql_query(
         "SELECT date AS التاريخ, student_name AS الطالب, (amount || ' - ' || rating) AS المراجعة FROM review_records",
         conn,
