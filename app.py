@@ -1,8 +1,10 @@
 import sqlite3
 from datetime import date
+import io
+import pandas as pd
 import streamlit as st
 
-# 1. إعداد قاعدة البيانات وتأسيس الجداول المتقطعة
+# 1. إعداد قاعدة البيانات وتأسيس الجداول
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
 cursor = conn.cursor()
 
@@ -16,7 +18,7 @@ CREATE TABLE IF NOT EXISTS students (
 """
 )
 
-# 1. جدول الحضور
+# جدول الحضور
 cursor.execute(
     """
 CREATE TABLE IF NOT EXISTS attendance_records (
@@ -28,7 +30,7 @@ CREATE TABLE IF NOT EXISTS attendance_records (
 """
 )
 
-# 2. جدول الحفظ
+# جدول الحفظ
 cursor.execute(
     """
 CREATE TABLE IF NOT EXISTS hifz_records (
@@ -43,7 +45,7 @@ CREATE TABLE IF NOT EXISTS hifz_records (
 """
 )
 
-# 3. جدول المراجعة
+# جدول المراجعة
 cursor.execute(
     """
 CREATE TABLE IF NOT EXISTS review_records (
@@ -62,7 +64,7 @@ st.set_page_config(
 )
 st.title("📖 برنامج إدارة مركز التحفيظ")
 
-# 2. القائمة الجانبية لإضافة الطلاب
+# 2. القائمة الجانبية لإدارة الطلاب
 st.sidebar.header("➕ إدارة الطلاب")
 new_student = st.sidebar.text_input("اسم الطالب الجديد:")
 if st.sidebar.button("إضافة الطالب"):
@@ -86,14 +88,12 @@ students_list = [row[0] for row in cursor.fetchall()]
 if not students_list:
     st.info("👈 لا يوجد طلاب مضافون بعد! قم بإضافة الطلاب من القائمة الجانبية.")
 else:
-    # إعداد البيانات العامة (الطالب والتاريخ)
     st.subheader("تسجيل التقييم اليومي")
     selected_student = st.selectbox("اختر اسم الطالب:", students_list)
     entry_date = st.date_input("التاريخ:", date.today())
 
     st.divider()
 
-    # تقسيم الشاشة إلى 3 أجزاء منفصلة
     tab1, tab2, tab3 = st.tabs(
         ["📝 الحضور والغياب", "📖 الحفظ الجديد", "🔄 المراجعة"]
     )
@@ -183,26 +183,42 @@ else:
                 f"تم حفظ مراجعة الطالب ({selected_student}) بنجاح!"
             )
 
-# عرض البيانات المخزنة
+# عرض البيانات وتصدير Excel
 st.divider()
-st.subheader("📋 السجلات المخزنة")
+st.subheader("📋 السجلات وتصدير البيانات")
 view_option = st.selectbox(
-    "اختر نوع السجل للعرض:",
+    "اختر نوع السجل للعرض والتصدير:",
     ["سجل الحضور", "سجل الحفظ الجديد", "سجل المراجعة"],
 )
 
 if view_option == "سجل الحضور":
-    cursor.execute(
-        "SELECT date, student_name, status FROM attendance_records ORDER BY id DESC"
+    df = pd.read_sql_query(
+        "SELECT date AS التاريخ, student_name AS اسم_الطالب, status AS الحالة FROM attendance_records ORDER BY id DESC",
+        conn,
     )
-    st.dataframe(cursor.fetchall())
 elif view_option == "سجل الحفظ الجديد":
-    cursor.execute(
-        "SELECT date, student_name, surah, from_ayah, to_ayah, rating FROM hifz_records ORDER BY id DESC"
+    df = pd.read_sql_query(
+        "SELECT date AS التاريخ, student_name AS اسم_الطالب, surah AS السورة, from_ayah AS من_آية, to_ayah AS إلى_آية, rating AS التقييم FROM hifz_records ORDER BY id DESC",
+        conn,
     )
-    st.dataframe(cursor.fetchall())
 else:
-    cursor.execute(
-        "SELECT date, student_name, amount, rating FROM review_records ORDER BY id DESC"
+    df = pd.read_sql_query(
+        "SELECT date AS التاريخ, student_name AS اسم_الطالب, amount AS مقدار_المراجعة, rating AS التقييم FROM review_records ORDER BY id DESC",
+        conn,
     )
-    st.dataframe(cursor.fetchall())
+
+# عرض الجدول
+st.dataframe(df)
+
+# تحويل الجدول لملف Excel للتنزيل
+output = io.BytesIO()
+with pd.ExcelWriter(output, engine="openpyxl") as writer:
+    df.to_excel(writer, index=False, sheet_name="بيانات_الحلقة")
+excel_data = output.getvalue()
+
+st.download_button(
+    label=f"📥 تحميل {view_option} كملف Excel",
+    data=excel_data,
+    file_name=f"{view_option}_{date.today()}.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+)
