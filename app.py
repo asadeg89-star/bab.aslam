@@ -51,6 +51,40 @@ conn.commit()
 st.set_page_config(
     page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered"
 )
+
+# --------------------------------------------------
+# تنسيق الواجهة لتكون من اليمين إلى اليسار (RTL)
+# --------------------------------------------------
+st.markdown(
+    """
+    <style>
+    /* تطبيق الاتجاه والمحاذاة من اليمين إلى اليسار */
+    html, body, [class*="st-"], [class*="css"], div, p, span, h1, h2, h3, h4, label {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+    
+    /* محاذاة عناصر الأدوات والقوائم */
+    .stSelectbox, .stTextInput, .stRadio, .stButton, .stDateInput, .stNumberInput {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+
+    /* محاذاة خيارات الراديو أفقياً وتعديل هوامشها */
+    div[data-testid="stMarkdownContainer"] > p {
+        text-align: right !important;
+    }
+    
+    /* تعديل الاتجاه للشريط الجانبي */
+    section[data-testid="stSidebar"] {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("📖 برنامج إدارة مركز التحفيظ")
 
 # 2. القائمة الجانبية لإدارة الطلاب (إضافة + إزالة)
