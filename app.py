@@ -183,42 +183,48 @@ else:
                 f"تم حفظ مراجعة الطالب ({selected_student}) بنجاح!"
             )
 
-# عرض البيانات وتصدير Excel
+# عرض البيانات وتصدير ملف Excel شامل لجميع الطلاب
 st.divider()
-st.subheader("📋 السجلات وتصدير البيانات")
-view_option = st.selectbox(
-    "اختر نوع السجل للعرض والتصدير:",
-    ["سجل الحضور", "سجل الحفظ الجديد", "سجل المراجعة"],
+st.subheader("📊 تصدير واستعراض بيانات جميع الطلاب")
+
+# استعلامات الجداول كاملة لجميع الطلاب
+df_att = pd.read_sql_query(
+    "SELECT date AS التاريخ, student_name AS اسم_الطالب, status AS حالة_الحضور FROM attendance_records ORDER BY date DESC, student_name ASC",
+    conn,
+)
+df_hifz = pd.read_sql_query(
+    "SELECT date AS التاريخ, student_name AS اسم_الطالب, surah AS السورة, from_ayah AS من_آية, to_ayah AS إلى_آية, rating AS التقييم FROM hifz_records ORDER BY date DESC, student_name ASC",
+    conn,
+)
+df_rev = pd.read_sql_query(
+    "SELECT date AS التاريخ, student_name AS اسم_الطالب, amount AS مقدار_المراجعة, rating AS التقييم FROM review_records ORDER BY date DESC, student_name ASC",
+    conn,
 )
 
-if view_option == "سجل الحضور":
-    df = pd.read_sql_query(
-        "SELECT date AS التاريخ, student_name AS اسم_الطالب, status AS الحالة FROM attendance_records ORDER BY id DESC",
-        conn,
-    )
-elif view_option == "سجل الحفظ الجديد":
-    df = pd.read_sql_query(
-        "SELECT date AS التاريخ, student_name AS اسم_الطالب, surah AS السورة, from_ayah AS من_آية, to_ayah AS إلى_آية, rating AS التقييم FROM hifz_records ORDER BY id DESC",
-        conn,
-    )
+# معاينة السجلات في الواجهة
+view_option = st.selectbox(
+    "اختر السجل للتأكد والمعاينة:",
+    ["جميع سجلات الحضور", "جميع سجلات الحفظ", "جميع سجلات المراجعة"],
+)
+
+if view_option == "جميع سجلات الحضور":
+    st.dataframe(df_att)
+elif view_option == "جميع سجلات الحفظ":
+    st.dataframe(df_hifz)
 else:
-    df = pd.read_sql_query(
-        "SELECT date AS التاريخ, student_name AS اسم_الطالب, amount AS مقدار_المراجعة, rating AS التقييم FROM review_records ORDER BY id DESC",
-        conn,
-    )
+    st.dataframe(df_rev)
 
-# عرض الجدول
-st.dataframe(df)
-
-# تحويل الجدول لملف Excel للتنزيل
+# إنشاء ملف Excel واحد يحتوي على 3 صفحات لجميع الطلاب
 output = io.BytesIO()
 with pd.ExcelWriter(output, engine="openpyxl") as writer:
-    df.to_excel(writer, index=False, sheet_name="بيانات_الحلقة")
+    df_att.to_excel(writer, index=False, sheet_name="سجل_الحضور_الكامل")
+    df_hifz.to_excel(writer, index=False, sheet_name="سجل_الحفظ_الكامل")
+    df_rev.to_excel(writer, index=False, sheet_name="سجل_المراجعة_الكامل")
 excel_data = output.getvalue()
 
 st.download_button(
-    label=f"📥 تحميل {view_option} كملف Excel",
+    label="📥 تنزيل تقرير Excel شامل لجميع الطلاب",
     data=excel_data,
-    file_name=f"{view_option}_{date.today()}.xlsx",
+    file_name=f"تقرير_المركز_الكامل_{date.today()}.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
