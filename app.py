@@ -4,7 +4,7 @@ import io
 import pandas as pd
 import streamlit as st
 
-# 1. إعداد قاعدة البيانات وتأسيس الجداول
+# 1. إعداد قاعدة البيانات ותأسيس الجداول
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
 cursor = conn.cursor()
 
@@ -127,7 +127,7 @@ else:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
 
         search_att = st.text_input(
-            "🔍 تصفية بكتـابة الحرف الأول من الاسم:", "", key="search_att"
+            "🔍 تصفية القائمة بكتابة بداية الاسم:", "", key="search_att"
         )
         filtered_att_students = [
             s for s in students_list if s.lower().startswith(search_att.strip().lower())
@@ -165,27 +165,16 @@ else:
                 f"✅ تم حفظ حضور {len(attendance_results)} طالب بتاريخ {entry_date} بنجاح!"
             )
 
-    # --- 2. قسم الحفظ الجديد ---
+    # --- 2. قسم الحفظ الجديد (قائمة موحدة ذكية) ---
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
 
-        search_hifz = st.text_input(
-            "🔎 اكتب الحرف الأول من اسم الطالب (مثلاً: م):",
-            "",
-            key="search_hifz_text",
-        )
-        
-        # تصفية الأسماء التي تبدأ فقط بالحروف المكتوبة
-        filtered_hifz_students = [
-            s for s in students_list if s.lower().startswith(search_hifz.strip().lower())
-        ]
-
         selected_student_hifz = st.selectbox(
-            "اختر الطالب من القائمة المفترزة:",
-            filtered_hifz_students,
+            "🔎 ابحث واختر اسم الطالب مباشرة:",
+            students_list,
             index=None,
-            placeholder="اضغط هنا لاختيار اسم الطالب...",
-            key="hifz_student_select",
+            placeholder="اضغط واكتب الحرف الأول من الاسم...",
+            key="hifz_student_single_select",
         )
 
         surah = st.text_input("سورة الحفظ:", "البقرة", key="hifz_surah")
@@ -206,7 +195,7 @@ else:
         )
         if st.button("حفظ التسميع 💾", key="save_hifz"):
             if selected_student_hifz is None:
-                st.error("⚠️ يرجى اختيار اسم الطالب من القائمة أولاً!")
+                st.error("⚠️ يرجى اختيار اسم الطالب أولاً!")
             else:
                 cursor.execute(
                     """
@@ -227,27 +216,16 @@ else:
                     f"تم حفظ تسميع الطالب ({selected_student_hifz}) بنجاح!"
                 )
 
-    # --- 3. قسم المراجعة ---
+    # --- 3. قسم المراجعة (قائمة موحدة ذكية) ---
     with tab3:
         st.markdown("### تسجيل المراجعة")
 
-        search_rev = st.text_input(
-            "🔎 اكتب الحرف الأول من اسم الطالب (مثلاً: م):",
-            "",
-            key="search_rev_text",
-        )
-        
-        # تصفية الأسماء التي تبدأ فقط بالحروف المكتوبة
-        filtered_rev_students = [
-            s for s in students_list if s.lower().startswith(search_rev.strip().lower())
-        ]
-
         selected_student_rev = st.selectbox(
-            "اختر الطالب من القائمة المفترزة:",
-            filtered_rev_students,
+            "🔎 ابحث واختر اسم الطالب مباشرة:",
+            students_list,
             index=None,
-            placeholder="اضغط هنا لاختيار اسم الطالب...",
-            key="rev_student_select",
+            placeholder="اضغط واكتب الحرف الأول من الاسم...",
+            key="rev_student_single_select",
         )
 
         review_amount = st.text_input(
@@ -260,7 +238,7 @@ else:
         )
         if st.button("حفظ المراجعة 💾", key="save_rev"):
             if selected_student_rev is None:
-                st.error("⚠️ يرجى اختيار اسم الطالب من القائمة أولاً!")
+                st.error("⚠️ يرجى اختيار اسم الطالب أولاً!")
             else:
                 cursor.execute(
                     """
@@ -296,7 +274,7 @@ if export_mode == "تصدير طالب محدد فقط (تقرير شخصي)":
         "🔎 اختر اسم الطالب لتنزيل ملفه الخاص:",
         students_list,
         index=None,
-        placeholder="اضغط هنا واكتب اسم الطالب...",
+        placeholder="اضغط واكتب اسم الطالب...",
         key="export_single_search",
     )
 
