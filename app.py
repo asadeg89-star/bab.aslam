@@ -3,7 +3,6 @@ from datetime import date
 import io
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 # 1. إعداد قاعدة البيانات وتأسيس الجداول
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
@@ -103,59 +102,6 @@ else:
     st.sidebar.info("لا يوجد طلاب مضافون حالياً.")
 
 # --------------------------------------------------
-# المكون التفاعلي للبحث اللحظي المباشر (JavaScript)
-# --------------------------------------------------
-def custom_live_search_selector(students, key_name):
-    students_json = str(students)
-    html_code = f"""
-    <div style="direction: rtl; font-family: sans-serif; width: 100%;">
-        <label style="font-weight: bold; font-size: 15px; color: #333; display: block; margin-bottom: 6px;">
-            🔍 اكتب الحرف الأول للبحث المباشر:
-        </label>
-        <input type="text" id="searchInput_{key_name}" placeholder="اضغط واكتب الحرف الأول (مثلاً: م)..." 
-               oninput="filterNames_{key_name}()" 
-               style="width: 100%; padding: 12px; font-size: 16px; border: 2px solid #ff4b4b; border-radius: 8px; outline: none; box-sizing: border-box; margin-bottom: 8px;">
-        
-        <select id="selectBox_{key_name}" size="5" style="width: 100%; font-size: 16px; padding: 6px; border: 1px solid #ccc; border-radius: 8px; outline: none; box-sizing: border-box;">
-        </select>
-    </div>
-
-    <script>
-        const allStudents_{key_name} = {students_json};
-        const searchInput_{key_name} = document.getElementById('searchInput_{key_name}');
-        const selectBox_{key_name} = document.getElementById('selectBox_{key_name}');
-
-        function populateSelect_{key_name}(list) {{
-            selectBox_{key_name}.innerHTML = '';
-            if (list.length === 0) {{
-                const opt = document.createElement('option');
-                opt.text = "⚠️ لا يوجد طالب يبدأ بهذا الحرف";
-                opt.disabled = true;
-                selectBox_{key_name}.add(opt);
-            }} else {{
-                list.forEach((name, idx) => {{
-                    const opt = document.createElement('option');
-                    opt.value = name;
-                    opt.text = name;
-                    if (idx === 0) opt.selected = true;
-                    selectBox_{key_name}.add(opt);
-                }});
-            }}
-        }}
-
-        function filterNames_{key_name}() {{
-            const query = searchInput_{key_name}.value.trim().toLowerCase();
-            const filtered = allStudents_{key_name}.filter(s => s.trim().toLowerCase().startsWith(query));
-            populateSelect_{key_name}(filtered);
-        }}
-
-        // Initial Load
-        populateSelect_{key_name}(allStudents_{key_name});
-    </script>
-    """
-    components.html(html_code, height=210)
-
-# --------------------------------------------------
 # الواجهة الرئيسية لتسجيل البيانات
 # --------------------------------------------------
 if not students_list:
@@ -211,18 +157,32 @@ else:
                 f"✅ تم حفظ حضور {len(attendance_results)} طالب بتاريخ {entry_date} بنجاح!"
             )
 
-    # --- 2. قسم الحفظ الجديد (بحث لايف تسلسلي) ---
+    # --- 2. قسم الحفظ الجديد ---
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
 
-        custom_live_search_selector(students_list, "hifz")
-
-        selected_student_hifz = st.selectbox(
-            "تأكيد اسم الطالب المختار للتسميع:",
-            students_list,
-            index=0 if students_list else None,
-            key="hifz_final_confirm",
+        search_h = st.text_input(
+            "🔍 اكتب بداية اسم الطالب (مثلاً: م):",
+            "",
+            key="search_prefix_hifz",
         )
+
+        # تصفية دقيقة تبدأ بالحرف المكتوب فقط
+        filtered_hifz = [
+            s for s in students_list if s.strip().startswith(search_h.strip())
+        ] if search_h.strip() else students_list
+
+        if filtered_hifz:
+            selected_student_hifz = st.radio(
+                "اختر الطالب من القائمة:",
+                options=filtered_hifz,
+                key="hifz_radio_select"
+            )
+        else:
+            st.warning("⚠️ لا يوجد طالب يبدأ بهذا الحرف!")
+            selected_student_hifz = None
+
+        st.divider()
 
         surah = st.text_input("سورة الحفظ:", "البقرة", key="hifz_surah")
         col1, col2 = st.columns(2)
@@ -263,18 +223,32 @@ else:
                     f"تم حفظ تسميع الطالب ({selected_student_hifz}) بنجاح!"
                 )
 
-    # --- 3. قسم المراجعة (بحث لايف تسلسلي) ---
+    # --- 3. قسم المراجعة ---
     with tab3:
         st.markdown("### تسجيل المراجعة")
 
-        custom_live_search_selector(students_list, "rev")
-
-        selected_student_rev = st.selectbox(
-            "تأكيد اسم الطالب المختار للمراجعة:",
-            students_list,
-            index=0 if students_list else None,
-            key="rev_final_confirm",
+        search_r = st.text_input(
+            "🔍 اكتب بداية اسم الطالب (مثلاً: م):",
+            "",
+            key="search_prefix_rev",
         )
+
+        # تصفية دقيقة تبدأ بالحرف المكتوب فقط
+        filtered_rev = [
+            s for s in students_list if s.strip().startswith(search_r.strip())
+        ] if search_r.strip() else students_list
+
+        if filtered_rev:
+            selected_student_rev = st.radio(
+                "اختر الطالب من القائمة:",
+                options=filtered_rev,
+                key="rev_radio_select"
+            )
+        else:
+            st.warning("⚠️ لا يوجد طالب يبدأ بهذا الحرف!")
+            selected_student_rev = None
+
+        st.divider()
 
         review_amount = st.text_input(
             "مقدار المراجعة:", "من سورة يس إلى الواقعة", key="rev_amount"
