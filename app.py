@@ -4,7 +4,7 @@ import io
 import pandas as pd
 import streamlit as st
 
-# 1. إعداد قاعدة البيانات ותأسيس الجداول
+# 1. إعداد قاعدة البيانات وتأسيس الجداول
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
 cursor = conn.cursor()
 
@@ -165,17 +165,34 @@ else:
                 f"✅ تم حفظ حضور {len(attendance_results)} طالب بتاريخ {entry_date} بنجاح!"
             )
 
-    # --- 2. قسم الحفظ الجديد (قائمة موحدة ذكية) ---
+    # --- 2. قسم الحفظ الجديد (تصفية ترتيبية دقيقة بالبداية فقط) ---
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
 
-        selected_student_hifz = st.selectbox(
-            "🔎 ابحث واختر اسم الطالب مباشرة:",
-            students_list,
-            index=None,
-            placeholder="اضغط واكتب الحرف الأول من الاسم...",
-            key="hifz_student_single_select",
+        search_hifz_key = st.text_input(
+            "🔍 ابحث بـ الحرف الأول من الاسم (مثلاً: م):",
+            "",
+            key="hifz_search_prefix",
         )
+
+        # تصفية دقيقة: يبدأ الاسم بالحرف المكتوب فقط
+        if search_hifz_key.strip():
+            matching_hifz = [
+                s for s in students_list if s.strip().startswith(search_hifz_key.strip())
+            ]
+        else:
+            matching_hifz = students_list
+
+        if matching_hifz:
+            selected_student_hifz = st.selectbox(
+                "اختر الطالب من النتائج المقترحة:",
+                matching_hifz,
+                index=0 if len(matching_hifz) > 0 else None,
+                key="hifz_filtered_select",
+            )
+        else:
+            st.warning("⚠️ لا يوجد طالب يبدأ بهذا الحرف!")
+            selected_student_hifz = None
 
         surah = st.text_input("سورة الحفظ:", "البقرة", key="hifz_surah")
         col1, col2 = st.columns(2)
@@ -216,17 +233,34 @@ else:
                     f"تم حفظ تسميع الطالب ({selected_student_hifz}) بنجاح!"
                 )
 
-    # --- 3. قسم المراجعة (قائمة موحدة ذكية) ---
+    # --- 3. قسم المراجعة (تصفية ترتيبية دقيقة بالبداية فقط) ---
     with tab3:
         st.markdown("### تسجيل المراجعة")
 
-        selected_student_rev = st.selectbox(
-            "🔎 ابحث واختر اسم الطالب مباشرة:",
-            students_list,
-            index=None,
-            placeholder="اضغط واكتب الحرف الأول من الاسم...",
-            key="rev_student_single_select",
+        search_rev_key = st.text_input(
+            "🔍 ابحث بـ الحرف الأول من الاسم (مثلاً: م):",
+            "",
+            key="rev_search_prefix",
         )
+
+        # تصفية دقيقة: يبدأ الاسم بالحرف المكتوب فقط
+        if search_rev_key.strip():
+            matching_rev = [
+                s for s in students_list if s.strip().startswith(search_rev_key.strip())
+            ]
+        else:
+            matching_rev = students_list
+
+        if matching_rev:
+            selected_student_rev = st.selectbox(
+                "اختر الطالب من النتائج المقترحة:",
+                matching_rev,
+                index=0 if len(matching_rev) > 0 else None,
+                key="rev_filtered_select",
+            )
+        else:
+            st.warning("⚠️ لا يوجد طالب يبدأ بهذا الحرف!")
+            selected_student_rev = None
 
         review_amount = st.text_input(
             "مقدار المراجعة:", "من سورة يس إلى الواقعة", key="rev_amount"
