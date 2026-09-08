@@ -3,6 +3,7 @@ from datetime import date
 import io
 import pandas as pd
 import streamlit as st
+from streamlit_searchbox import st_searchbox
 
 # 1. إعداد قاعدة البيانات وتأسيس الجداول
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
@@ -78,6 +79,18 @@ st.sidebar.divider()
 cursor.execute("SELECT name FROM students ORDER BY name ASC")
 students_list = [row[0] for row in cursor.fetchall()]
 
+
+# دالة البحث اللايف (Live Search) لتصفية الأسماء مباشرة
+def search_students(search_term: str):
+    if not search_term:
+        return students_list
+    return [
+        s
+        for s in students_list
+        if s.strip().lower().startswith(search_term.strip().lower())
+    ]
+
+
 # قسم إزالة طالب
 st.sidebar.subheader("🗑️ إزالة طالب")
 if students_list:
@@ -122,7 +135,9 @@ else:
             "🔍 تصفية القائمة بكتابة بداية الاسم:", "", key="search_att"
         )
         filtered_att_students = [
-            s for s in students_list if s.lower().startswith(search_att.strip().lower())
+            s
+            for s in students_list
+            if s.lower().startswith(search_att.strip().lower())
         ]
 
         st.caption("حدد حالة كل طالب ثم اضغط على زر الحفظ النهائي بالأسفل:")
@@ -161,26 +176,15 @@ else:
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
 
-        search_h = st.text_input(
-            "🔍 اكتب بداية اسم الطالب (مثلاً: م):",
-            "",
-            key="search_prefix_hifz",
+        # بحث لايف ومباشر بالكامل
+        selected_student_hifz = st_searchbox(
+            search_students,
+            placeholder="🔍 اكتب اسم الطالب أو الحرف الأول مباشرة...",
+            key="hifz_live_search",
         )
 
-        # تصفية دقيقة تبدأ بالحرف المكتوب فقط
-        filtered_hifz = [
-            s for s in students_list if s.strip().startswith(search_h.strip())
-        ] if search_h.strip() else students_list
-
-        if filtered_hifz:
-            selected_student_hifz = st.radio(
-                "اختر الطالب من القائمة:",
-                options=filtered_hifz,
-                key="hifz_radio_select"
-            )
-        else:
-            st.warning("⚠️ لا يوجد طالب يبدأ بهذا الحرف!")
-            selected_student_hifz = None
+        if selected_student_hifz:
+            st.success(f"تم اختيار الطالب: *{selected_student_hifz}*")
 
         st.divider()
 
@@ -201,8 +205,8 @@ else:
             key="hifz_rate",
         )
         if st.button("حفظ التسميع 💾", key="save_hifz"):
-            if selected_student_hifz is None:
-                st.error("⚠️ يرجى اختيار اسم الطالب أولاً!")
+            if not selected_student_hifz:
+                st.error("⚠️ يرجى اختيار اسم الطالب أولاً من قائمة البحث!")
             else:
                 cursor.execute(
                     """
@@ -227,26 +231,15 @@ else:
     with tab3:
         st.markdown("### تسجيل المراجعة")
 
-        search_r = st.text_input(
-            "🔍 اكتب بداية اسم الطالب (مثلاً: م):",
-            "",
-            key="search_prefix_rev",
+        # بحث لايف ومباشر بالكامل
+        selected_student_rev = st_searchbox(
+            search_students,
+            placeholder="🔍 اكتب اسم الطالب أو الحرف الأول مباشرة...",
+            key="rev_live_search",
         )
 
-        # تصفية دقيقة تبدأ بالحرف المكتوب فقط
-        filtered_rev = [
-            s for s in students_list if s.strip().startswith(search_r.strip())
-        ] if search_r.strip() else students_list
-
-        if filtered_rev:
-            selected_student_rev = st.radio(
-                "اختر الطالب من القائمة:",
-                options=filtered_rev,
-                key="rev_radio_select"
-            )
-        else:
-            st.warning("⚠️ لا يوجد طالب يبدأ بهذا الحرف!")
-            selected_student_rev = None
+        if selected_student_rev:
+            st.success(f"تم اختيار الطالب: *{selected_student_rev}*")
 
         st.divider()
 
@@ -259,8 +252,8 @@ else:
             key="rev_rate",
         )
         if st.button("حفظ المراجعة 💾", key="save_rev"):
-            if selected_student_rev is None:
-                st.error("⚠️ يرجى اختيار اسم الطالب أولاً!")
+            if not selected_student_rev:
+                st.error("⚠️ يرجى اختيار اسم الطالب أولاً من قائمة البحث!")
             else:
                 cursor.execute(
                     """
