@@ -127,10 +127,10 @@ else:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
 
         search_att = st.text_input(
-            "🔍 تصفية أسماء كشف الحضور (اكتب حرفاً أو اسماً):", "", key="search_att"
+            "🔍 تصفية بكتـابة الحرف الأول من الاسم:", "", key="search_att"
         )
         filtered_att_students = [
-            s for s in students_list if search_att.strip().lower() in s.lower()
+            s for s in students_list if s.lower().startswith(search_att.strip().lower())
         ]
 
         st.caption("حدد حالة كل طالب ثم اضغط على زر الحفظ النهائي بالأسفل:")
@@ -169,12 +169,23 @@ else:
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
 
+        search_hifz = st.text_input(
+            "🔎 اكتب الحرف الأول من اسم الطالب (مثلاً: م):",
+            "",
+            key="search_hifz_text",
+        )
+        
+        # تصفية الأسماء التي تبدأ فقط بالحروف المكتوبة
+        filtered_hifz_students = [
+            s for s in students_list if s.lower().startswith(search_hifz.strip().lower())
+        ]
+
         selected_student_hifz = st.selectbox(
-            "🔎 ابحث عن اسم الطالب (اكتب حرفاً أو اختر مباشرة):",
-            students_list,
+            "اختر الطالب من القائمة المفترزة:",
+            filtered_hifz_students,
             index=None,
-            placeholder="اضغط هنا واكتب اسم الطالب...",
-            key="hifz_student_search",
+            placeholder="اضغط هنا لاختيار اسم الطالب...",
+            key="hifz_student_select",
         )
 
         surah = st.text_input("سورة الحفظ:", "البقرة", key="hifz_surah")
@@ -195,7 +206,7 @@ else:
         )
         if st.button("حفظ التسميع 💾", key="save_hifz"):
             if selected_student_hifz is None:
-                st.error("⚠️ يرجى اختيار أو البحث عن اسم الطالب أولاً!")
+                st.error("⚠️ يرجى اختيار اسم الطالب من القائمة أولاً!")
             else:
                 cursor.execute(
                     """
@@ -220,12 +231,23 @@ else:
     with tab3:
         st.markdown("### تسجيل المراجعة")
 
+        search_rev = st.text_input(
+            "🔎 اكتب الحرف الأول من اسم الطالب (مثلاً: م):",
+            "",
+            key="search_rev_text",
+        )
+        
+        # تصفية الأسماء التي تبدأ فقط بالحروف المكتوبة
+        filtered_rev_students = [
+            s for s in students_list if s.lower().startswith(search_rev.strip().lower())
+        ]
+
         selected_student_rev = st.selectbox(
-            "🔎 ابحث عن اسم الطالب (اكتب حرفاً أو اختر مباشرة):",
-            students_list,
+            "اختر الطالب من القائمة المفترزة:",
+            filtered_rev_students,
             index=None,
-            placeholder="اضغط هنا واكتب اسم الطالب...",
-            key="rev_student_search",
+            placeholder="اضغط هنا لاختيار اسم الطالب...",
+            key="rev_student_select",
         )
 
         review_amount = st.text_input(
@@ -238,7 +260,7 @@ else:
         )
         if st.button("حفظ المراجعة 💾", key="save_rev"):
             if selected_student_rev is None:
-                st.error("⚠️ يرجى اختيار أو البحث عن اسم الطالب أولاً!")
+                st.error("⚠️ يرجى اختيار اسم الطالب من القائمة أولاً!")
             else:
                 cursor.execute(
                     """
@@ -258,7 +280,7 @@ else:
                 )
 
 # --------------------------------------------------
-# قسم تصدير واستعراض البيانات (شامل أسبوعي/شخصي)
+# قسم تصدير واستعراض البيانات
 # --------------------------------------------------
 st.divider()
 st.subheader("📊 تصدير البيانات إلى ملف Excel")
