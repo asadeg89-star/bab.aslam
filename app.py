@@ -8,7 +8,6 @@ import streamlit as st
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# جدول الطلاب
 cursor.execute(
     """
 CREATE TABLE IF NOT EXISTS students (
@@ -18,7 +17,6 @@ CREATE TABLE IF NOT EXISTS students (
 """
 )
 
-# جدول الحضور
 cursor.execute(
     """
 CREATE TABLE IF NOT EXISTS attendance_records (
@@ -30,7 +28,6 @@ CREATE TABLE IF NOT EXISTS attendance_records (
 """
 )
 
-# جدول الحفظ
 cursor.execute(
     """
 CREATE TABLE IF NOT EXISTS hifz_records (
@@ -45,7 +42,6 @@ CREATE TABLE IF NOT EXISTS hifz_records (
 """
 )
 
-# جدول المراجعة
 cursor.execute(
     """
 CREATE TABLE IF NOT EXISTS review_records (
@@ -81,7 +77,6 @@ if st.sidebar.button("إضافة الطالب"):
     else:
         st.sidebar.warning("يرجى كتابة اسم الطالب.")
 
-# جلب قائمة الطلاب
 cursor.execute("SELECT name FROM students ORDER BY name ASC")
 students_list = [row[0] for row in cursor.fetchall()]
 
@@ -98,7 +93,6 @@ else:
         ["📝 الحضور والغياب", "📖 الحفظ الجديد", "🔄 المراجعة"]
     )
 
-    # --- 1. قسم الحضور والغياب ---
     with tab1:
         st.markdown("### تسجيل الحضور والغياب")
         attendance_status = st.radio(
@@ -120,7 +114,6 @@ else:
                 f"تم حفظ حضور الطالب ({selected_student}) كـ [{attendance_status}] بنجاح!"
             )
 
-    # --- 2. قسم الحفظ الجديد ---
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
         surah = st.text_input("سورة الحفظ:", "البقرة", key="hifz_surah")
@@ -159,7 +152,6 @@ else:
                 f"تم حفظ تسميع الطالب ({selected_student}) لسورة {surah} بنجاح!"
             )
 
-    # --- 3. قسم المراجعة ---
     with tab3:
         st.markdown("### تسجيل المراجعة")
         review_amount = st.text_input(
@@ -182,69 +174,72 @@ else:
             st.success(f"تم حفظ مراجعة الطالب ({selected_student}) بنجاح!")
 
 # --------------------------------------------------
-# قسم تصدير واستعراض البيانات (فردي وشامل)
+# قسم إعادة تنسيق وتصدير الجداول بالعرض أفصقياً (Pivot)
 # --------------------------------------------------
 st.divider()
-st.subheader("📊 استعراض وتنزيل تقارير Excel")
+st.subheader("📊 استعراض وتنزيل تقارير Excel الشبكية")
 
-# خيار تحديد نطاق التنزيل (طالب معين أم جميع الطلاب)
-export_scope = st.radio(
-    "اختر نطاق البيانات المطلوب تصديرها:",
-    ["جميع الطلاب معاً", "طالب محدد فقط"],
-    horizontal=True,
+# 1. تجهيز جدول الحضور الشبكي
+df_att_raw = pd.read_sql_query(
+    "SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records",
+    conn,
 )
-
-if export_scope == "طالب محدد فقط":
-    filter_student = st.selectbox(
-        "اختر الطالب المراد تنزيل بياناته:", students_list
-    )
-
-    query_att = (
-        f"SELECT student_name AS اسم_الطالب, date AS التاريخ, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{filter_student}' ORDER BY date DESC"
-    )
-    query_hifz = (
-        f"SELECT student_name AS اسم_الطالب, date AS التاريخ, surah AS السورة, from_ayah AS من_آية, to_ayah AS إلى_آية, rating AS التقييم FROM hifz_records WHERE student_name = '{filter_student}' ORDER BY date DESC"
-    )
-    query_rev = (
-        f"SELECT student_name AS اسم_الطالب, date AS التاريخ, amount AS مقدار_المراجعة, rating AS التقييم FROM review_records WHERE student_name = '{filter_student}' ORDER BY date DESC"
-    )
-    file_prefix = f"تقرير_الطالب_{filter_student}"
+if not df_att_raw.empty:
+    df_att_pivot = df_att_raw.pivot_table(
+        index="التاريخ", columns="الطالب", values="الحالة", aggfunc="first"
+    ).reset_index()
 else:
-    query_att = "SELECT student_name AS اسم_الطالب, date AS التاريخ, status AS حالة_الحضور FROM attendance_records ORDER BY date DESC, student_name ASC"
-    query_hifz = "SELECT student_name AS اسم_الطالب, date AS التاريخ, surah AS السورة, from_ayah AS من_آية, to_ayah AS إلى_آية, rating AS التقييم FROM hifz_records ORDER BY date DESC, student_name ASC"
-    query_rev = "SELECT student_name AS اسم_الطالب, date AS التاريخ, amount AS مقدار_المراجعة, rating AS التقييم FROM review_records ORDER BY date DESC, student_name ASC"
-    file_prefix = "تقرير_جميع_الطلاب"
+    df_att_pivot = pd.DataFrame(columns=["التاريخ"])
 
-# قراءة البيانات
-df_att = pd.read_sql_query(query_att, conn)
-df_hifz = pd.read_sql_query(query_hifz, conn)
-df_rev = pd.read_sql_query(query_rev, conn)
+# 2. تجهيز جدول الحفظ الشبكي (سورة والآيات والتقييم)
+df_hifz_raw = pd.read_sql_query(
+    "SELECT date AS التاريخ, student_name AS الطالب, (surah || ' [' || from_ayah || '-' || to_ayah || '] - ' || rating) AS الحفظ FROM hifz_records",
+    conn,
+)
+if not df_hifz_raw.empty:
+    df_hifz_pivot = df_hifz_raw.pivot_table(
+        index="التاريخ", columns="الطالب", values="الحفظ", aggfunc="first"
+    ).reset_index()
+else:
+    df_hifz_pivot = pd.DataFrame(columns=["التاريخ"])
+
+# 3. تجهيز جدول المراجعة الشبكي
+df_rev_raw = pd.read_sql_query(
+    "SELECT date AS التاريخ, student_name AS الطالب, (amount || ' - ' || rating) AS المراجعة FROM review_records",
+    conn,
+)
+if not df_rev_raw.empty:
+    df_rev_pivot = df_rev_raw.pivot_table(
+        index="التاريخ", columns="الطالب", values="المراجعة", aggfunc="first"
+    ).reset_index()
+else:
+    df_rev_pivot = pd.DataFrame(columns=["التاريخ"])
 
 # معاينة السجلات في الواجهة
 view_option = st.selectbox(
     "اختر السجل للمعاينة قبل التنزيل:",
-    ["سجل الحضور", "سجل الحفظ الجديد", "سجل المراجعة"],
+    ["سجل الحضور الشبكي", "سجل الحفظ الشبكي", "سجل المراجعة الشبكي"],
 )
 
-if view_option == "سجل الحضور":
-    st.dataframe(df_att)
-elif view_option == "سجل الحفظ الجديد":
-    st.dataframe(df_hifz)
+if view_option == "سجل الحضور الشبكي":
+    st.dataframe(df_att_pivot)
+elif view_option == "سجل الحفظ الشبكي":
+    st.dataframe(df_hifz_pivot)
 else:
-    st.dataframe(df_rev)
+    st.dataframe(df_rev_pivot)
 
-# إنشاء ملف Excel يحتوي على العمود "اسم الطالب" كعمود أساسي
+# إنشاء ملف Excel بالتنسيق الشبكي الجديد
 output = io.BytesIO()
 with pd.ExcelWriter(output, engine="openpyxl") as writer:
-    df_att.to_excel(writer, index=False, sheet_name="سجل_الحضور")
-    df_hifz.to_excel(writer, index=False, sheet_name="سجل_الحفظ")
-    df_rev.to_excel(writer, index=False, sheet_name="سجل_المراجعة")
+    df_att_pivot.to_excel(writer, index=False, sheet_name="سجل_الحضور")
+    df_hifz_pivot.to_excel(writer, index=False, sheet_name="سجل_الحفظ")
+    df_rev_pivot.to_excel(writer, index=False, sheet_name="سجل_المراجعة")
 excel_data = output.getvalue()
 
 # زر التنزيل
 st.download_button(
-    label=f"📥 تنزيل Excel ({file_prefix})",
+    label="📥 تنزيل ملف Excel الشبكي الشامل",
     data=excel_data,
-    file_name=f"{file_prefix}_{date.today()}.xlsx",
+    file_name=f"تقرير_المركز_المجمع_{date.today()}.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
