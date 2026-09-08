@@ -90,7 +90,7 @@ else:
         ["📝 الحضور والغياب المجمع", "📖 الحفظ الجديد", "🔄 المراجعة"]
     )
 
-    # --- 1. قسم الحضور والغياب المجمع (جدول سريع) ---
+    # --- 1. قسم الحضور والغياب المجمع ---
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
         st.caption("حدد حالة كل طالب ثم اضغط على زر الحفظ النهائي بالأسفل:")
@@ -98,13 +98,12 @@ else:
         attendance_results = {}
         status_options = ["حضور", "غياب", "غياب بعذر", "تأخير"]
 
-        # إنشاء القائمة لكل طالب بشكل شبكي مرن
         for idx, student in enumerate(students_list):
             st.write(f"*{idx + 1}. {student}*")
             selected_status = st.radio(
                 f"حالة {student}:",
                 options=status_options,
-                index=0,  # افتراضياً: حضور
+                index=0,
                 key=f"att_{student}",
                 horizontal=True,
                 label_visibility="collapsed",
@@ -199,72 +198,106 @@ else:
             st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev}) بنجاح!")
 
 # --------------------------------------------------
-# قسم إعادة تنسيق وتصدير الجداول الشبكية (Excel)
+# قسم تصدير واستعراض البيانات (شامل أسبوعي/شخصي)
 # --------------------------------------------------
 st.divider()
-st.subheader("📊 استعراض وتنزيل تقارير Excel الشبكية")
+st.subheader("📊 تصدير البيانات إلى ملف Excel")
 
-# 1. تجهيز جدول الحضور الشبكي
-df_att_raw = pd.read_sql_query(
-    "SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records",
-    conn,
+export_mode = st.radio(
+    "اختر طريقة التصدير المطلوبة:",
+    ["تصدير جميع الطلاب (تنسيق شبكي أفقي)", "تصدير طالب محدد فقط (تقرير شخصي)"],
+    horizontal=True,
 )
-if not df_att_raw.empty:
-    df_att_pivot = df_att_raw.pivot_table(
-        index="التاريخ", columns="الطالب", values="الحالة", aggfunc="first"
-    ).reset_index()
+
+if export_mode == "تصدير طالب محدد فقط (تقرير شخصي)":
+    single_student = st.selectbox("اختر اسم الطالب لتنزيل ملفه:", students_list)
+
+    df_att_single = pd.read_sql_query(
+        f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student}' ORDER BY date DESC",
+        conn,
+    )
+    df_hifz_single = pd.read_sql_query(
+        f"SELECT date AS التاريخ, student_name AS الطالب, surah AS السورة, from_ayah AS من_آية, to_ayah AS إلى_آية, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student}' ORDER BY date DESC",
+        conn,
+    )
+    df_rev_single = pd.read_sql_query(
+        f"SELECT date AS التاريخ, student_name AS الطالب, amount AS مقدار_المراجعة, rating AS التقييم FROM review_records WHERE student_name = '{single_student}' ORDER BY date DESC",
+        conn,
+    )
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_att_single.to_excel(writer, index=False, sheet_name="سجل_الحضور")
+        df_hifz_single.to_excel(writer, index=False, sheet_name="سجل_الحفظ")
+        df_rev_single.to_excel(writer, index=False, sheet_name="سجل_المراجعة")
+    excel_data = output.getvalue()
+
+    st.download_button(
+        label=f"📥 تنزيل ملف Excel الخاص بـ ({single_student})",
+        data=excel_data,
+        file_name=f"تقرير_{single_student}_{date.today()}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
 else:
-    df_att_pivot = pd.DataFrame(columns=["التاريخ"])
+    # 1. تجهيز جدول الحضور الشبكي
+    df_att_raw = pd.read_sql_query(
+        "SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records",
+        conn,
+    )
+    if not df_att_raw.empty:
+        df_att_pivot = df_att_raw.pivot_table(
+            index="التاريخ", columns="الطالب", values="الحالة", aggfunc="first"
+        ).reset_index()
+    else:
+        df_att_pivot = pd.DataFrame(columns=["التاريخ"])
 
-# 2. تجهيز جدول الحفظ الشبكي
-df_hifz_raw = pd.read_sql_query(
-    "SELECT date AS التاريخ, student_name AS الطالب, (surah || ' [' || from_ayah || '-' || to_ayah || '] - ' || rating) AS الحفظ FROM hifz_records",
-    conn,
-)
-if not df_hifz_raw.empty:
-    df_hifz_pivot = df_hifz_raw.pivot_table(
-        index="التاريخ", columns="الطالب", values="الحفظ", aggfunc="first"
-    ).reset_index()
-else:
-    df_hifz_pivot = pd.DataFrame(columns=["التاريخ"])
+    # 2. تجهيز جدول الحفظ الشبكي
+    df_hifz_raw = pd.read_sql_query(
+        "SELECT date AS التاريخ, student_name AS الطالب, (surah || ' [' || from_ayah || '-' || to_ayah || '] - ' || rating) AS الحفظ FROM hifz_records",
+        conn,
+    )
+    if not df_hifz_raw.empty:
+        df_hifz_pivot = df_hifz_raw.pivot_table(
+            index="التاريخ", columns="الطالب", values="الحفظ", aggfunc="first"
+        ).reset_index()
+    else:
+        df_hifz_pivot = pd.DataFrame(columns=["التاريخ"])
 
-# 3. تجهيز جدول المراجعة الشبكي
-df_rev_raw = pd.read_sql_query(
-    "SELECT date AS التاريخ, student_name AS الطالب, (amount || ' - ' || rating) AS المراجعة FROM review_records",
-    conn,
-)
-if not df_rev_raw.empty:
-    df_rev_pivot = df_rev_raw.pivot_table(
-        index="التاريخ", columns="الطالب", values="المراجعة", aggfunc="first"
-    ).reset_index()
-else:
-    df_rev_pivot = pd.DataFrame(columns=["التاريخ"])
+    # 3. تجهيز جدول المراجعة الشبكي
+    df_rev_raw = pd.read_sql_query(
+        "SELECT date AS التاريخ, student_name AS الطالب, (amount || ' - ' || rating) AS المراجعة FROM review_records",
+        conn,
+    )
+    if not df_rev_raw.empty:
+        df_rev_pivot = df_rev_raw.pivot_table(
+            index="التاريخ", columns="الطالب", values="المراجعة", aggfunc="first"
+        ).reset_index()
+    else:
+        df_rev_pivot = pd.DataFrame(columns=["التاريخ"])
 
-# معاينة السجلات
-view_option = st.selectbox(
-    "اختر السجل للمعاينة قبل التنزيل:",
-    ["سجل الحضور الشبكي", "سجل الحفظ الشبكي", "سجل المراجعة الشبكي"],
-)
+    view_option = st.selectbox(
+        "اختر السجل للمعاينة قبل التنزيل:",
+        ["سجل الحضور الشبكي", "سجل الحفظ الشبكي", "سجل المراجعة الشبكي"],
+    )
 
-if view_option == "سجل الحضور الشبكي":
-    st.dataframe(df_att_pivot)
-elif view_option == "سجل الحفظ الشبكي":
-    st.dataframe(df_hifz_pivot)
-else:
-    st.dataframe(df_rev_pivot)
+    if view_option == "سجل الحضور الشبكي":
+        st.dataframe(df_att_pivot)
+    elif view_option == "سجل الحفظ الشبكي":
+        st.dataframe(df_hifz_pivot)
+    else:
+        st.dataframe(df_rev_pivot)
 
-# إنشاء ملف Excel
-output = io.BytesIO()
-with pd.ExcelWriter(output, engine="openpyxl") as writer:
-    df_att_pivot.to_excel(writer, index=False, sheet_name="سجل_الحضور")
-    df_hifz_pivot.to_excel(writer, index=False, sheet_name="سجل_الحفظ")
-    df_rev_pivot.to_excel(writer, index=False, sheet_name="سجل_المراجعة")
-excel_data = output.getvalue()
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df_att_pivot.to_excel(writer, index=False, sheet_name="سجل_الحضور")
+        df_hifz_pivot.to_excel(writer, index=False, sheet_name="سجل_الحفظ")
+        df_rev_pivot.to_excel(writer, index=False, sheet_name="سجل_المراجعة")
+    excel_data = output.getvalue()
 
-# زر التنزيل
-st.download_button(
-    label="📥 تنزيل ملف Excel الشبكي الشامل",
-    data=excel_data,
-    file_name=f"تقرير_المركز_المجمع_{date.today()}.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-)
+    st.download_button(
+        label="📥 تنزيل ملف Excel الشبكي الشامل لجميع الطلاب",
+        data=excel_data,
+        file_name=f"تقرير_المركز_المجمع_{date.today()}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
