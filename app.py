@@ -82,7 +82,7 @@ if st.sidebar.button("إضافة الطالب"):
 
 st.sidebar.divider()
 
-# جلب قائمة الطلاب الحالية
+# جلب قائمة الطلاب الحالية مرتبة أبجدياً
 cursor.execute("SELECT name FROM students ORDER BY name ASC")
 students_list = [row[0] for row in cursor.fetchall()]
 
@@ -118,12 +118,17 @@ else:
     # --- 1. قسم الحضور والغياب المجمع ---
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
+        
+        # تصفية سريعة لأسماء الحضور بالبحث الحرفي
+        search_att = st.text_input("🔍 تصفية أسماء كشف الحضور (اكتب حرفاً أو اسماً):", "", key="search_att")
+        filtered_att_students = [s for s in students_list if search_att.strip().lower() in s.lower()]
+
         st.caption("حدد حالة كل طالب ثم اضغط على زر الحفظ النهائي بالأسفل:")
 
         attendance_results = {}
         status_options = ["حضور", "غياب", "غياب بعذر", "تأخير"]
 
-        for idx, student in enumerate(students_list):
+        for idx, student in enumerate(filtered_att_students):
             st.write(f"*{idx + 1}. {student}*")
             selected_status = st.radio(
                 f"حالة {student}:",
@@ -136,7 +141,7 @@ else:
             attendance_results[student] = selected_status
             st.divider()
 
-        if st.button("💾 حفظ كشف الحضور لجميع الطلاب", type="primary"):
+        if st.button("💾 حفظ كشف الحضور لجميع الطلاب الظاهرين", type="primary"):
             for student_name, status in attendance_results.items():
                 cursor.execute(
                     """
@@ -153,9 +158,15 @@ else:
     # --- 2. قسم الحفظ الجديد ---
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
+        
+        # اختيار مباشر مع إمكانية البحث بالكتابة داخل المربع
         selected_student_hifz = st.selectbox(
-            "اختر اسم الطالب للحفظ:", students_list, key="hifz_student"
+            "🔎 ابحث عن اسم الطالب أو اختره مباشر من القائمة (اكتب حرفاً لتصفية الأسماء):",
+            students_list,
+            index=0,
+            key="hifz_student_search",
         )
+        
         surah = st.text_input("سورة الحفظ:", "البقرة", key="hifz_surah")
         col1, col2 = st.columns(2)
         with col1:
@@ -195,9 +206,15 @@ else:
     # --- 3. قسم المراجعة ---
     with tab3:
         st.markdown("### تسجيل المراجعة")
+        
+        # اختيار مباشر مع إمكانية البحث بالكتابة داخل المربع
         selected_student_rev = st.selectbox(
-            "اختر اسم الطالب للمراجعة:", students_list, key="rev_student"
+            "🔎 ابحث عن اسم الطالب أو اختره مباشر من القائمة (اكتب حرفاً لتصفية الأسماء):",
+            students_list,
+            index=0,
+            key="rev_student_search",
         )
+        
         review_amount = st.text_input(
             "مقدار المراجعة:", "من سورة يس إلى الواقعة", key="rev_amount"
         )
@@ -235,7 +252,11 @@ export_mode = st.radio(
 )
 
 if export_mode == "تصدير طالب محدد فقط (تقرير شخصي)":
-    single_student = st.selectbox("اختر اسم الطالب لتنزيل ملفه:", students_list)
+    single_student = st.selectbox(
+        "🔎 اختر اسم الطالب لتنزيل ملفه الخاص (يمكنك البحث بالتنفيذ المباشر):",
+        students_list,
+        key="export_single_search",
+    )
 
     df_att_single = pd.read_sql_query(
         f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student}' ORDER BY date DESC",
