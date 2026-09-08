@@ -172,11 +172,10 @@ else:
                 f"✅ تم حفظ حضور {len(attendance_results)} طالب بتاريخ {entry_date} بنجاح!"
             )
 
-    # --- 2. قسم الحفظ الجديد ---
+    # --- 2. قسم الحفظ الجديد (مُعدّل للتقييم السريع فقط) ---
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
 
-        # بحث لايف ومباشر بالكامل
         selected_student_hifz = st_searchbox(
             search_students,
             placeholder="🔍 اكتب اسم الطالب أو الحرف الأول مباشرة...",
@@ -188,22 +187,13 @@ else:
 
         st.divider()
 
-        surah = st.text_input("سورة الحفظ:", "البقرة", key="hifz_surah")
-        col1, col2 = st.columns(2)
-        with col1:
-            from_ayah = st.number_input(
-                "من آية:", min_value=1, value=1, key="hifz_from"
-            )
-        with col2:
-            to_ayah = st.number_input(
-                "إلى آية:", min_value=1, value=10, key="hifz_to"
-            )
-
-        hifz_rating = st.selectbox(
+        hifz_rating = st.radio(
             "تقييم الحفظ:",
-            ["ممتاز", "جيد جداً", "جيد", "إعادة تسميع", "لم يحفظ"],
+            ["جيد", "إعادة"],
+            horizontal=True,
             key="hifz_rate",
         )
+
         if st.button("حفظ التسميع 💾", key="save_hifz"):
             if not selected_student_hifz:
                 st.error("⚠️ يرجى اختيار اسم الطالب أولاً من قائمة البحث!")
@@ -216,22 +206,21 @@ else:
                     (
                         str(entry_date),
                         selected_student_hifz,
-                        surah,
-                        from_ayah,
-                        to_ayah,
+                        "-",
+                        0,
+                        0,
                         hifz_rating,
                     ),
                 )
                 conn.commit()
                 st.success(
-                    f"تم حفظ تسميع الطالب ({selected_student_hifz}) بنجاح!"
+                    f"تم حفظ تسميع الطالب ({selected_student_hifz}) وتقييمه: [{hifz_rating}] بنجاح!"
                 )
 
     # --- 3. قسم المراجعة ---
     with tab3:
         st.markdown("### تسجيل المراجعة")
 
-        # بحث لايف ومباشر بالكامل
         selected_student_rev = st_searchbox(
             search_students,
             placeholder="🔍 اكتب اسم الطالب أو الحرف الأول مباشرة...",
@@ -299,7 +288,7 @@ if export_mode == "تصدير طالب محدد فقط (تقرير شخصي)":
             conn,
         )
         df_hifz_single = pd.read_sql_query(
-            f"SELECT date AS التاريخ, student_name AS الطالب, surah AS السورة, from_ayah AS من_آية, to_ayah AS إلى_آية, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student}' ORDER BY date DESC",
+            f"SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student}' ORDER BY date DESC",
             conn,
         )
         df_rev_single = pd.read_sql_query(
@@ -338,7 +327,7 @@ else:
         df_att_pivot = pd.DataFrame(columns=["التاريخ"])
 
     df_hifz_raw = pd.read_sql_query(
-        "SELECT date AS التاريخ, student_name AS الطالب, (surah || ' [' || from_ayah || '-' || to_ayah || '] - ' || rating) AS الحفظ FROM hifz_records",
+        "SELECT date AS التاريخ, student_name AS الطالب, rating AS الحفظ FROM hifz_records",
         conn,
     )
     if not df_hifz_raw.empty:
