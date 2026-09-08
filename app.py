@@ -83,39 +83,55 @@ students_list = [row[0] for row in cursor.fetchall()]
 if not students_list:
     st.info("👈 لا يوجد طلاب مضافون بعد! قم بإضافة الطلاب من القائمة الجانبية.")
 else:
-    st.subheader("تسجيل التقييم اليومي")
-    selected_student = st.selectbox("اختر اسم الطالب:", students_list)
-    entry_date = st.date_input("التاريخ:", date.today())
-
+    entry_date = st.date_input("📅 تحديد تاريخ اليوم:", date.today())
     st.divider()
 
     tab1, tab2, tab3 = st.tabs(
-        ["📝 الحضور والغياب", "📖 الحفظ الجديد", "🔄 المراجعة"]
+        ["📝 الحضور والغياب المجمع", "📖 الحفظ الجديد", "🔄 المراجعة"]
     )
 
+    # --- 1. قسم الحضور والغياب المجمع (جدول سريع) ---
     with tab1:
-        st.markdown("### تسجيل الحضور والغياب")
-        attendance_status = st.radio(
-            "حالة الحضور:",
-            ["حاضر", "غائب", "غائب بعذر"],
-            horizontal=True,
-            key="att_status",
-        )
-        if st.button("حفظ الحضور 💾", key="save_att"):
-            cursor.execute(
-                """
-                INSERT INTO attendance_records (date, student_name, status)
-                VALUES (?, ?, ?)
-            """,
-                (str(entry_date), selected_student, attendance_status),
+        st.markdown("### 📋 كشف الحضور والغياب الجماعي")
+        st.caption("حدد حالة كل طالب ثم اضغط على زر الحفظ النهائي بالأسفل:")
+
+        attendance_results = {}
+        status_options = ["حضور", "غياب", "غياب بعذر", "تأخير"]
+
+        # إنشاء القائمة لكل طالب بشكل شبكي مرن
+        for idx, student in enumerate(students_list):
+            st.write(f"*{idx + 1}. {student}*")
+            selected_status = st.radio(
+                f"حالة {student}:",
+                options=status_options,
+                index=0,  # افتراضياً: حضور
+                key=f"att_{student}",
+                horizontal=True,
+                label_visibility="collapsed",
             )
+            attendance_results[student] = selected_status
+            st.divider()
+
+        if st.button("💾 حفظ كشف الحضور لجميع الطلاب", type="primary"):
+            for student_name, status in attendance_results.items():
+                cursor.execute(
+                    """
+                    INSERT INTO attendance_records (date, student_name, status)
+                    VALUES (?, ?, ?)
+                """,
+                    (str(entry_date), student_name, status),
+                )
             conn.commit()
             st.success(
-                f"تم حفظ حضور الطالب ({selected_student}) كـ [{attendance_status}] بنجاح!"
+                f"✅ تم حفظ حضور {len(attendance_results)} طالب بتاريخ {entry_date} بنجاح!"
             )
 
+    # --- 2. قسم الحفظ الجديد ---
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
+        selected_student_hifz = st.selectbox(
+            "اختر اسم الطالب للحفظ:", students_list, key="hifz_student"
+        )
         surah = st.text_input("سورة الحفظ:", "البقرة", key="hifz_surah")
         col1, col2 = st.columns(2)
         with col1:
@@ -140,7 +156,7 @@ else:
             """,
                 (
                     str(entry_date),
-                    selected_student,
+                    selected_student_hifz,
                     surah,
                     from_ayah,
                     to_ayah,
@@ -149,11 +165,15 @@ else:
             )
             conn.commit()
             st.success(
-                f"تم حفظ تسميع الطالب ({selected_student}) لسورة {surah} بنجاح!"
+                f"تم حفظ تسميع الطالب ({selected_student_hifz}) بنجاح!"
             )
 
+    # --- 3. قسم المراجعة ---
     with tab3:
         st.markdown("### تسجيل المراجعة")
+        selected_student_rev = st.selectbox(
+            "اختر اسم الطالب للمراجعة:", students_list, key="rev_student"
+        )
         review_amount = st.text_input(
             "مقدار المراجعة:", "من سورة يس إلى الواقعة", key="rev_amount"
         )
@@ -168,13 +188,18 @@ else:
                 INSERT INTO review_records (date, student_name, amount, rating)
                 VALUES (?, ?, ?, ?)
             """,
-                (str(entry_date), selected_student, review_amount, review_rating),
+                (
+                    str(entry_date),
+                    selected_student_rev,
+                    review_amount,
+                    review_rating,
+                ),
             )
             conn.commit()
-            st.success(f"تم حفظ مراجعة الطالب ({selected_student}) بنجاح!")
+            st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev}) بنجاح!")
 
 # --------------------------------------------------
-# قسم إعادة تنسيق وتصدير الجداول بالعرض أفصقياً (Pivot)
+# قسم إعادة تنسيق وتصدير الجداول الشبكية (Excel)
 # --------------------------------------------------
 st.divider()
 st.subheader("📊 استعراض وتنزيل تقارير Excel الشبكية")
@@ -191,7 +216,7 @@ if not df_att_raw.empty:
 else:
     df_att_pivot = pd.DataFrame(columns=["التاريخ"])
 
-# 2. تجهيز جدول الحفظ الشبكي (سورة والآيات والتقييم)
+# 2. تجهيز جدول الحفظ الشبكي
 df_hifz_raw = pd.read_sql_query(
     "SELECT date AS التاريخ, student_name AS الطالب, (surah || ' [' || from_ayah || '-' || to_ayah || '] - ' || rating) AS الحفظ FROM hifz_records",
     conn,
@@ -215,7 +240,7 @@ if not df_rev_raw.empty:
 else:
     df_rev_pivot = pd.DataFrame(columns=["التاريخ"])
 
-# معاينة السجلات في الواجهة
+# معاينة السجلات
 view_option = st.selectbox(
     "اختر السجل للمعاينة قبل التنزيل:",
     ["سجل الحضور الشبكي", "سجل الحفظ الشبكي", "سجل المراجعة الشبكي"],
@@ -228,7 +253,7 @@ elif view_option == "سجل الحفظ الشبكي":
 else:
     st.dataframe(df_rev_pivot)
 
-# إنشاء ملف Excel بالتنسيق الشبكي الجديد
+# إنشاء ملف Excel
 output = io.BytesIO()
 with pd.ExcelWriter(output, engine="openpyxl") as writer:
     df_att_pivot.to_excel(writer, index=False, sheet_name="سجل_الحضور")
