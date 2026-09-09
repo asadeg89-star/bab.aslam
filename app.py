@@ -1,10 +1,11 @@
 import sqlite3
 from datetime import date
+import io
 import pandas as pd
 import streamlit as st
 import altair as alt
 
-st.set_page_config(page_title="مركز تحفيظ باب السلام", page_icon="📖", layout="centered")
+st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
 
 AHZAB_LIST = [
     "الأعلى", "النبأ", "الجن", "الملك", "الجمعة", "المجادلة", "الرحمن", 
@@ -149,18 +150,94 @@ if st.sidebar.button("🚪 تسجيل الخروج"):
     st.rerun()
 
 st.sidebar.divider()
-st.title("📖 مركز تحفيظ باب السلام")
+
+# قسم إدارة الطلاب والاسترداد في القائمة الجانبية (خاص بمدير النظام)
+if st.session_state['role'] == 'admin':
+    st.sidebar.markdown("### ⚙️ لوحة تحكم المدير")
+    
+    with st.sidebar.expander("👥 إدارة الطلاب"):
+        new_student = st.text_input("اسم الطالب الجديد:")
+        if st.button("➕ إضافة الطالب"):
+            if new_student.strip():
+                try:
+                    cursor.execute("INSERT INTO students (name) VALUES (?)", (new_student.strip(),))
+                    conn.commit()
+                    st.success(f"تم إضافة الطالب ({new_student}) بنجاح!")
+                    st.rerun()
+                except sqlite3.IntegrityError:
+                    st.error("اسم الطالب موجود مسبقاً!")
+            else:
+                st.warning("يرجى كتابة اسم الطالب.")
+
+        cursor.execute("SELECT name FROM students ORDER BY name ASC")
+        current_students = [row[0] for row in cursor.fetchall()]
+        if current_students:
+            del_student = st.selectbox("اختر الطالب للحذف:", current_students, index=None, placeholder="اختر طالباً...")
+            if st.button("🗑️ حذف الطالب المحدد", type="primary"):
+                if del_student:
+                    cursor.execute("DELETE FROM students WHERE name = ?", (del_student,))
+                    cursor.execute("DELETE FROM attendance_records WHERE student_name = ?", (del_student,))
+                    cursor.execute("DELETE FROM hifz_records WHERE student_name = ?", (del_student,))
+                    cursor.execute("DELETE FROM review_records WHERE student_name = ?", (del_student,))
+                    conn.commit()
+                    st.success(f"تم حذف الطالب ({del_student}) وجميع سجلاته بنجاح!")
+                    st.rerun()
+
+    with st.sidebar.expander("📥 استرداد وتنزيل البيانات (Backup)"):
+        backup_format = st.radio("اختر صيغة التنزيل:", ["Excel (.xlsx)", "PDF (.pdf)"], horizontal=True)
+        if st.button("تنزيل النسخة الاحتياطية الشاملة"):
+            df_att_all = pd.read_sql_query("SELECT * FROM attendance_records", conn)
+            df_hifz_all = pd.read_sql_query("SELECT * FROM hifz_records", conn)
+            df_rev_all = pd.read_sql_query("SELECT * FROM review_records", conn)
+            df_students_all = pd.read_sql_query("SELECT * FROM students", conn)
+
+            if "Excel" in backup_format:
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df_students_all.to_excel(writer, index=False, sheet_name='الطلاب')
+                    df_att_all.to_excel(writer, index=False, sheet_name='الحضور')
+                    df_hifz_all.to_excel(writer, index=False, sheet_name='الحفظ')
+                    df_rev_all.to_excel(writer, index=False, sheet_name='المراجعة')
+                st.download_button(
+                    label="📥 اضغط هنا لتنزيل ملف Excel",
+                    data=output.getvalue(),
+                    file_name=f"Quran_Center_Backup_{date.today()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+            else:
+                # توليد تقرير نصي/HTML خفيف أو جدول للـ PDF
+                html_content = f"""
+                <html dir="rtl">
+                <head><meta charset="utf-8"><style>body{{font-family:Tahoma; direction:rtl; text-align:right;}} table{{width:100%; border-collapse:collapse;}} th, td{{border:1px solid #ddd; padding:8px; text-align:center;}} th{{background-color:#f2f2f2;}}</style></head>
+                <body>
+                <h2>تقرير النسخة الاحتياطية لمركز التحفيظ - {date.today()}</h2>
+                <h3>الطلاب المسجلون</h3>
+                {df_students_all.to_html(index=False)}
+                <h3>سجلات الحضور</h3>
+                {df_att_all.to_html(index=False)}
+                </body>
+                </html>
+                """
+                st.download_button(
+                    label="📥 اضغط هنا لتنزيل ملف النسخة الاحتياطية",
+                    data=html_content,
+                    file_name=f"Quran_Center_Backup_{date.today()}.html",
+                    mime="text/html"
+                )
+    st.sidebar.divider()
+
+st.title("📖 برنامج إدارة مركز التحفيظ")
 
 cursor.execute("SELECT name FROM students ORDER BY name ASC")
 students_list = [row[0] for row in cursor.fetchall()]
 
 if not students_list:
-    st.info("👈 لا يوجد طلاب مضافون بعد! قم بإضافة الطلاب من القائمة الجانبية.")
+    st.info("👈 لا يوجد طلاب مضافون بعد! قم بإضافة الطلاب من القائمة الجانبية (لوحة تحكم المدير).")
 else:
     entry_date = st.date_input("📅 تحديد تاريخ اليوم:", date.today())
     st.divider()
 
-    tab1, tab2, tab3 = st.tabs(["📝 حضور وغياب", "📖 الحفظ الجديد", "🔄 المراجعة"])
+    tab1, tab2, tab3 = st.tabs(["📝 الحضور والغياب الجماعي", "📖 الحفظ الجديد", "🔄 المراجعة"])
 
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
@@ -183,6 +260,7 @@ else:
                 cursor.execute("DELETE FROM attendance_records WHERE date = ? AND student_name = ?", (str(entry_date), student_name))
                 cursor.execute("INSERT INTO attendance_records (date, student_name, status) VALUES (?, ?, ?)", (str(entry_date), student_name, status))
                 
+                # إذا كان الطالب غائباً يتم تثبيت الحفظ والمراجعة كـ "غائب" تلقائياً
                 if status in ["غياب", "غياب بعذر"]:
                     cursor.execute("DELETE FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), student_name))
                     cursor.execute("INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating) VALUES (?, ?, ?, ?, ?, ?)", (str(entry_date), student_name, "-", 0, 0, "غائب"))
