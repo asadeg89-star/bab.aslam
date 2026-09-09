@@ -178,6 +178,13 @@ st.markdown("""
         border-radius: 6px;
         font-weight: bold;
     }
+    .badge-absent {
+        background-color: #f3f4f6;
+        color: #4b5563;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-weight: bold;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -316,7 +323,7 @@ else:
     tab1, tab2, tab3 = st.tabs(["📝 الحضور والغياب المجمع والتصدير", "📖 الحفظ الجديد", "🔄 المراجعة"])
 
     # --------------------------------------------------
-    # TAB 1: الحضور والغياب وتصدير البيانات
+    # TAB 1: الحضور والغياب وتصدير البيانات (مع التحديث التلقائي للحفظ والمراجعة عند الغياب)
     # --------------------------------------------------
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
@@ -341,12 +348,26 @@ else:
 
         if st.button("💾 حفظ كشف الحضور لجميع الطلاب الظاهرين", type="primary"):
             for student_name, status in attendance_results.items():
+                # 1. حفظ حالة الحضور
                 cursor.execute("""
                     INSERT INTO attendance_records (date, student_name, status)
                     VALUES (?, ?, ?)
                 """, (str(entry_date), student_name, status))
+                
+                # 2. إذا كان الطالب غائباً (غياب أو غياب بعذر)، نقوم بتسجيله تلقائياً في الحفظ والمراجعة بتقدير "غائب"
+                if status in ["غياب", "غياب بعذر"]:
+                    cursor.execute("""
+                        INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (str(entry_date), student_name, "-", 0, 0, "غائب"))
+                    
+                    cursor.execute("""
+                        INSERT INTO review_records (date, student_name, amount, rating)
+                        VALUES (?, ?, ?, ?)
+                    """, (str(entry_date), student_name, "غائب", "غائب"))
+                    
             conn.commit()
-            st.success("✅ تم حفظ الحضور بنجاح!")
+            st.success("✅ تم حفظ كشف الحضور وتحديث السجلات المرتبطة بالغياب بنجاح!")
 
         # --------------------------------------------------
         # قسم تصدير البيانات إلى Excel
@@ -452,7 +473,7 @@ else:
         if selected_student_hifz:
             st.success(f"تم اختيار الطالب: *{selected_student_hifz}*")
             
-            hifz_rating = st.radio("تقييم الحفظ اليوم:", ["جيد", "إعادة"], horizontal=True, key="hifz_rate")
+            hifz_rating = st.radio("تقييم الحفظ اليوم:", ["جيد", "إعادة", "غائب"], horizontal=True, key="hifz_rate")
             
             if st.button("حفظ التسميع 💾", key="save_hifz", type="primary"):
                 cursor.execute("""
@@ -475,7 +496,12 @@ else:
             if not df_student_hifz.empty:
                 html_table = "<table class='custom-table'><thead><tr><th>التاريخ</th><th>التقييم</th></tr></thead><tbody>"
                 for _, row in df_student_hifz.iterrows():
-                    badge = "badge-good" if row['التقييم'] == "جيد" else "badge-retry"
+                    if row['التقييم'] == "جيد":
+                        badge = "badge-good"
+                    elif row['التقييم'] == "إعادة":
+                        badge = "badge-retry"
+                    else:
+                        badge = "badge-absent"
                     html_table += f"<tr><td>{row['التاريخ']}</td><td><span class='{badge}'>{row['التقييم']}</span></td></tr>"
                 html_table += "</tbody></table>"
 
@@ -493,7 +519,7 @@ else:
                 ).encode(
                     x=alt.X('التقييم:N', title='نوع التقييم', axis=alt.Axis(labelAngle=0, labelFontSize=14, titleFontSize=14)),
                     y=alt.Y('العدد:Q', title='عدد المرات', axis=alt.Axis(labelFontSize=12, titleFontSize=14)),
-                    color=alt.Color('التقييم:N', scale=alt.Scale(domain=['جيد', 'إعادة'], range=['#10b981', '#ef4444']), legend=None),
+                    color=alt.Color('التقييم:N', scale=alt.Scale(domain=['جيد', 'إعادة', 'غائب'], range=['#10b981', '#ef4444', '#6b7280']), legend=None),
                     tooltip=['التقييم', 'العدد']
                 )
 
@@ -514,7 +540,7 @@ else:
                 st.info("لا توجد سجلات حفظ سابقة لهذا الطالب حتى الآن.")
 
     # --------------------------------------------------
-    # TAB 3: المراجعة (قائمة عمودية مترتبة بدقة بدون أخطاء الجوال)
+    # TAB 3: المراجعة
     # --------------------------------------------------
     with tab3:
         st.markdown("### 🔄 تسجيل المراجعة")
@@ -543,7 +569,6 @@ else:
 
             if st.session_state["show_hizb_grid"]:
                 st.info("اضغط على اسم الحزب لاختياره مباشرة:")
-                # عرض الأحزاب بشكل عمودي متسلسل بدقة تامة لتجنب تداخل الشاشات الصغيرة
                 for idx, hizb in enumerate(AHZAB_LIST):
                     if st.button(hizb, key=f"hizb_btn_{idx}", use_container_width=True):
                         st.session_state["selected_hizb"] = hizb
@@ -555,7 +580,7 @@ else:
             if review_hizb:
                 st.success(f"تم تحديد الحزب: *{review_hizb}*")
                 
-                review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
+                review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة", "غائب"], horizontal=True, key="rev_rate")
                 
                 if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
                     cursor.execute("""
@@ -582,7 +607,12 @@ else:
             if not df_student_rev.empty:
                 html_table = "<table class='custom-table'><thead><tr><th>التاريخ</th><th>حزب المراجعة</th><th>التقييم</th></tr></thead><tbody>"
                 for _, row in df_student_rev.iterrows():
-                    badge = "badge-good" if row['التقييم'] == "جيد" else "badge-retry"
+                    if row['التقييم'] == "جيد":
+                        badge = "badge-good"
+                    elif row['التقييم'] == "إعادة":
+                        badge = "badge-retry"
+                    else:
+                        badge = "badge-absent"
                     html_table += f"<tr><td>{row['التاريخ']}</td><td>{row['حزب_المراجعة']}</td><td><span class='{badge}'>{row['التقييم']}</span></td></tr>"
                 html_table += "</tbody></table>"
 
@@ -600,7 +630,7 @@ else:
                 ).encode(
                     x=alt.X('التقييم:N', title='نوع التقييم', axis=alt.Axis(labelAngle=0, labelFontSize=14, titleFontSize=14)),
                     y=alt.Y('العدد:Q', title='عدد المرات', axis=alt.Axis(labelFontSize=12, titleFontSize=14)),
-                    color=alt.Color('التقييم:N', scale=alt.Scale(domain=['جيد', 'إعادة'], range=['#10b981', '#ef4444']), legend=None),
+                    color=alt.Color('التقييم:N', scale=alt.Scale(domain=['جيد', 'إعادة', 'غائب'], range=['#10b981', '#ef4444', '#6b7280']), legend=None),
                     tooltip=['التقييم', 'العدد']
                 )
 
