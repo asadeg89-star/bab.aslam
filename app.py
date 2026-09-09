@@ -233,6 +233,27 @@ if st.session_state['role'] == 'admin':
             else:
                 st.warning("يرجى إدخال اسم المستخدم وكلمة المرور.")
 
+    with st.sidebar.expander("🗑️ حذف معلم"):
+        cursor.execute("SELECT username FROM users WHERE username != 'admin'")
+        teachers_list = [row[0] for row in cursor.fetchall()]
+        
+        if teachers_list:
+            selected_teacher_to_delete = st.selectbox("اختر المعلم للحذف:", teachers_list, index=None, placeholder="اختر معلماً...", key="del_teacher_sb")
+            confirm_teacher_del = st.checkbox("أوافق على حذف هذا المعلم نهائياً", key="confirm_teacher_del_box")
+            
+            if st.button("🗑️ حذف المعلم المحدد", type="primary", use_container_width=True):
+                if selected_teacher_to_delete and confirm_teacher_del:
+                    cursor.execute("DELETE FROM users WHERE username = ?", (selected_teacher_to_delete,))
+                    conn.commit()
+                    st.success(f"تم حذف المعلم ({selected_teacher_to_delete}) بنجاح!")
+                    st.rerun()
+                elif not selected_teacher_to_delete:
+                    st.warning("يرجى اختيار معلم أولاً.")
+                else:
+                    st.error("يرجى تحديد مربع التأكيد أولاً.")
+        else:
+            st.info("لا يوجد معلمون مضافون للحذف حالياً.")
+
     with st.sidebar.expander("👥 إدارة الطلاب (إضافة / حذف)"):
         new_student = st.text_input("اسم الطالب الجديد:")
         if st.button("➕ إضافة الطالب", use_container_width=True):
@@ -456,7 +477,6 @@ else:
 
     st.divider()
 
-    # التحكم في التبويبات حسب الصلاحية (المدير يرى تبويب متابعة تسلسل الأحزاب، المعلم لا يراه)
     if st.session_state['role'] == 'admin':
         tab1, tab2, tab3, tab4 = st.tabs(["📝 الحضور والغياب الجماعي", "📖 الحفظ الجديد", "🔄 المراجعة", "🎯 متابعة تسلسل الأحزاب"])
     else:
@@ -610,7 +630,6 @@ else:
                 html_table += "</tbody></table>"
                 st.markdown(html_table, unsafe_allow_html=True)
 
-    # تبويب متابعة تسلسل الأحزاب يظهر حصرياً لمدير النظام (admin)
     if st.session_state['role'] == 'admin':
         with tab4:
             st.markdown("### 🎯 متابعة تسلسل الأحزاب (مراجعة الحلقة)")
