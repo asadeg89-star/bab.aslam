@@ -399,34 +399,34 @@ else:
     # تحديد التاريخ: يظهر حصرياً للمدير، بينما باقي الأعضاء يُحدد تلقائياً بتاريخ اليوم
     if st.session_state['role'] == 'admin':
         entry_date = st.date_input("📅 تحديد التاريخ (خاص بمدير النظام):", date.today())
+        
+        # زر لإغلاق اليوم وتعبئة السجلات الفارغة بـ "لم يسمع" تلقائياً (خاص بمدير النظام فقط)
+        if st.button("🔒 إغلاق اليوم وترصيد السجلات الفارغة بـ (لم يسمع)", help="يقوم هذا الزر بفحص جميع الطلاب الحاضرين في هذا اليوم ومن لم يتم تقييمه في الحفظ أو المراجعة يتم رصدها تلقائياً بكلمة لم يسمع"):
+            cursor.execute("SELECT student_name FROM attendance_records WHERE date = ? AND status = 'حضور'", (str(entry_date),))
+            present_students = [row[0] for row in cursor.fetchall()]
+            
+            updated_count = 0
+            for s_name in present_students:
+                # التحقق من سجل الحفظ لهذا اليوم
+                cursor.execute("SELECT id FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), s_name))
+                if not cursor.fetchone():
+                    cursor.execute("INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating) VALUES (?, ?, ?, ?, ?, ?)", (str(entry_date), s_name, "-", 0, 0, "لم يسمع"))
+                    updated_count += 1
+                
+                # التحقق من سجل المراجعة لهذا اليوم
+                cursor.execute("SELECT id FROM review_records WHERE date = ? AND student_name = ?", (str(entry_date), s_name))
+                if not cursor.fetchone():
+                    cursor.execute("INSERT INTO review_records (date, student_name, amount, rating) VALUES (?, ?, ?, ?)", (str(entry_date), s_name, "لم يسمع", "لم يسمع"))
+                    updated_count += 1
+            
+            conn.commit()
+            if updated_count > 0:
+                st.success(f"✅ تم إغلاق اليوم وترصيد الحالات الفارغة بـ (لم يسمع) بنجاح لـ {updated_count} سجل!")
+            else:
+                st.info("جميع الطلاب الحاضرين مسجلة تقييماتهم مسبقاً ولا توجد حالات فارغة.")
     else:
         entry_date = date.today()
         st.caption(f"📅 تاريخ التسجيل اليوم: *{entry_date}*")
-
-    # زر لإغلاق اليوم وتعبئة السجلات الفارغة بـ "لم يسمع" تلقائياً
-    if st.button("🔒 إغلاق اليوم وترصيد السجلات الفارغة بـ (لم يسمع)", help="يقوم هذا الزر بفحص جميع الطلاب الحاضرين في هذا اليوم ومن لم يتم تقييمه في الحفظ أو المراجعة يتم رصدها تلقائياً بكلمة لم يسمع"):
-        cursor.execute("SELECT student_name FROM attendance_records WHERE date = ? AND status = 'حضور'", (str(entry_date),))
-        present_students = [row[0] for row in cursor.fetchall()]
-        
-        updated_count = 0
-        for s_name in present_students:
-            # التحقق من سجل الحفظ لهذا اليوم
-            cursor.execute("SELECT id FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), s_name))
-            if not cursor.fetchone():
-                cursor.execute("INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating) VALUES (?, ?, ?, ?, ?, ?)", (str(entry_date), s_name, "-", 0, 0, "لم يسمع"))
-                updated_count += 1
-            
-            # التحقق من سجل المراجعة لهذا اليوم
-            cursor.execute("SELECT id FROM review_records WHERE date = ? AND student_name = ?", (str(entry_date), s_name))
-            if not cursor.fetchone():
-                cursor.execute("INSERT INTO review_records (date, student_name, amount, rating) VALUES (?, ?, ?, ?)", (str(entry_date), s_name, "لم يسمع", "لم يسمع"))
-                updated_count += 1
-        
-        conn.commit()
-        if updated_count > 0:
-            st.success(f"✅ تم إغلاق اليوم وترصيد الحالات الفارغة بـ (لم يسمع) بنجاح لـ {updated_count} سجل!")
-        else:
-            st.info("جميع الطلاب الحاضرين مسجلة تقييماتهم مسبقاً ولا توجد حالات فارغة.")
 
     st.divider()
 
