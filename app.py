@@ -323,7 +323,7 @@ else:
     tab1, tab2, tab3 = st.tabs(["📝 الحضور والغياب المجمع والتصدير", "📖 الحفظ الجديد", "🔄 المراجعة"])
 
     # --------------------------------------------------
-    # TAB 1: الحضور والغياب وتصدير البيانات (مع التحديث التلقائي للحفظ والمراجعة عند الغياب)
+    # TAB 1: الحضور والغياب وتصدير البيانات
     # --------------------------------------------------
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
@@ -348,13 +348,11 @@ else:
 
         if st.button("💾 حفظ كشف الحضور لجميع الطلاب الظاهرين", type="primary"):
             for student_name, status in attendance_results.items():
-                # 1. حفظ حالة الحضور
                 cursor.execute("""
                     INSERT INTO attendance_records (date, student_name, status)
                     VALUES (?, ?, ?)
                 """, (str(entry_date), student_name, status))
                 
-                # 2. إذا كان الطالب غائباً (غياب أو غياب بعذر)، نقوم بتسجيله تلقائياً في الحفظ والمراجعة بتقدير "غائب"
                 if status in ["غياب", "غياب بعذر"]:
                     cursor.execute("""
                         INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
@@ -540,7 +538,7 @@ else:
                 st.info("لا توجد سجلات حفظ سابقة لهذا الطالب حتى الآن.")
 
     # --------------------------------------------------
-    # TAB 3: المراجعة
+    # TAB 3: المراجعة (بدون خيار غائب في الأزرار والتشارت، وموجود في الجدول)
     # --------------------------------------------------
     with tab3:
         st.markdown("### 🔄 تسجيل المراجعة")
@@ -580,7 +578,8 @@ else:
             if review_hizb:
                 st.success(f"تم تحديد الحزب: *{review_hizb}*")
                 
-                review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة", "غائب"], horizontal=True, key="rev_rate")
+                # إزالة "غائب" من خيارات التقييم اليدوي للمراجعة
+                review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
                 
                 if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
                     cursor.execute("""
@@ -605,6 +604,7 @@ else:
             )
 
             if not df_student_rev.empty:
+                # الجدول يظهر فيه حالة الغياب بشكل طبيعي
                 html_table = "<table class='custom-table'><thead><tr><th>التاريخ</th><th>حزب المراجعة</th><th>التقييم</th></tr></thead><tbody>"
                 for _, row in df_student_rev.iterrows():
                     if row['التقييم'] == "جيد":
@@ -620,32 +620,37 @@ else:
 
                 st.divider()
 
-                rating_counts = df_student_rev['التقييم'].value_counts().reset_index()
-                rating_counts.columns = ['التقييم', 'العدد']
+                # استبعاد "غائب" من الرسم البياني (Chart) بحيث يعرض "جيد" و "إعادة" فقط
+                df_chart_rev = df_student_rev[df_student_rev['التقييم'] != 'غائب']
 
-                bars = alt.Chart(rating_counts).mark_bar(
-                    cornerRadiusTopLeft=10,
-                    cornerRadiusTopRight=10,
-                    width=60
-                ).encode(
-                    x=alt.X('التقييم:N', title='نوع التقييم', axis=alt.Axis(labelAngle=0, labelFontSize=14, titleFontSize=14)),
-                    y=alt.Y('العدد:Q', title='عدد المرات', axis=alt.Axis(labelFontSize=12, titleFontSize=14)),
-                    color=alt.Color('التقييم:N', scale=alt.Scale(domain=['جيد', 'إعادة', 'غائب'], range=['#10b981', '#ef4444', '#6b7280']), legend=None),
-                    tooltip=['التقييم', 'العدد']
-                )
+                if not df_chart_rev.empty:
+                    rating_counts = df_chart_rev['التقييم'].value_counts().reset_index()
+                    rating_counts.columns = ['التقييم', 'العدد']
 
-                text = bars.mark_text(
-                    align='center',
-                    baseline='bottom',
-                    dy=-5,
-                    fontSize=14,
-                    fontWeight='bold'
-                ).encode(
-                    text='العدد:Q'
-                )
+                    bars = alt.Chart(rating_counts).mark_bar(
+                        cornerRadiusTopLeft=10,
+                        cornerRadiusTopRight=10,
+                        width=60
+                    ).encode(
+                        x=alt.X('التقييم:N', title='نوع التقييم', axis=alt.Axis(labelAngle=0, labelFontSize=14, titleFontSize=14)),
+                        y=alt.Y('العدد:Q', title='عدد المرات', axis=alt.Axis(labelFontSize=12, titleFontSize=14)),
+                        color=alt.Color('التقييم:N', scale=alt.Scale(domain=['جيد', 'إعادة'], range=['#10b981', '#ef4444']), legend=None),
+                        tooltip=['التقييم', 'العدد']
+                    )
 
-                chart = (bars + text).properties(height=280)
+                    text = bars.mark_text(
+                        align='center',
+                        baseline='bottom',
+                        dy=-5,
+                        fontSize=14,
+                        fontWeight='bold'
+                    ).encode(
+                        text='العدد:Q'
+                    )
 
-                st.altair_chart(chart, use_container_width=True)
+                    chart = (bars + text).properties(height=280)
+                    st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.info("لا توجد تقييمات (جيد/إعادة) كافية لعرض الرسم البياني حالياً.")
             else:
                 st.info("لا توجد سجلات مراجعة سابقة لهذا الطالب حتى الآن.")
