@@ -4,7 +4,6 @@ import io
 import pandas as pd
 import streamlit as st
 import altair as alt
-from streamlit_searchbox import st_searchbox
 
 # 1. إعداد قاعدة البيانات وتأسيس الجداول
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
@@ -213,11 +212,6 @@ if st.session_state["role"] == "admin":
 cursor.execute("SELECT name FROM students ORDER BY name ASC")
 students_list = [row[0] for row in cursor.fetchall()]
 
-def search_students(search_term: str):
-    if not search_term:
-        return students_list
-    return [s for s in students_list if s.strip().lower().startswith(search_term.strip().lower())]
-
 if st.session_state["role"] == "admin":
     st.sidebar.subheader("🗑️ إزالة طالب")
     if students_list:
@@ -374,10 +368,13 @@ else:
     with tab2:
         st.markdown("### 📖 تسجيل الحفظ الجديد")
         
-        selected_student_hifz = st_searchbox(
-            search_students,
-            placeholder="🔍 اكتب اسم الطالب أو الحرف الأول مباشرة...",
-            key="hifz_live_search"
+        # استخدام st.selectbox المدمجة لعرض جميع الأسماء مباشرة والبحث عند الكتابة
+        selected_student_hifz = st.selectbox(
+            "🔍 اختر اسم الطالب أو اكتب للبحث:",
+            students_list,
+            index=None,
+            placeholder="اضغط لاختيار الطالب أو اكتب اسمه...",
+            key="hifz_select_student"
         )
         
         if selected_student_hifz:
@@ -452,10 +449,12 @@ else:
     # --------------------------------------------------
     with tab3:
         st.markdown("### 🔄 تسجيل المراجعة")
-        selected_student_rev = st_searchbox(
-            search_students,
-            placeholder="🔍 اكتب اسم الطالب أو الحرف الأول مباشرة...",
-            key="rev_live_search"
+        selected_student_rev = st.selectbox(
+            "🔍 اختر اسم الطالب أو اكتب للبحث:",
+            students_list,
+            index=None,
+            placeholder="اضغط لاختيار الطالب أو اكتب اسمه...",
+            key="rev_select_student"
         )
         
         if selected_student_rev:
