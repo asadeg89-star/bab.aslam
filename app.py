@@ -151,11 +151,11 @@ if st.sidebar.button("🚪 تسجيل الخروج"):
 
 st.sidebar.divider()
 
-# قسم إدارة الطلاب والاسترداد في القائمة الجانبية (خاص بمدير النظام)
+# قسم إدارة الطلاب والاسترداد في القائمة الجانبية (خاص بمدير النظام فقط)
 if st.session_state['role'] == 'admin':
-    st.sidebar.markdown("### ⚙️ لوحة تحكم المدير")
+    st.sidebar.markdown("### ⚙️ لوحة تحكم المدير (الاسترداد والتصدير)")
     
-    with st.sidebar.expander("👥 إدارة الطلاب"):
+    with st.sidebar.expander("👥 إدارة الطلاب (إضافة / حذف)"):
         new_student = st.text_input("اسم الطالب الجديد:")
         if st.button("➕ إضافة الطالب"):
             if new_student.strip():
@@ -170,9 +170,9 @@ if st.session_state['role'] == 'admin':
                 st.warning("يرجى كتابة اسم الطالب.")
 
         cursor.execute("SELECT name FROM students ORDER BY name ASC")
-        current_students = [row[0] for row in cursor.fetchall()]
-        if current_students:
-            del_student = st.selectbox("اختر الطالب للحذف:", current_students, index=None, placeholder="اختر طالباً...")
+        current_students_list = [row[0] for row in cursor.fetchall()]
+        if current_students_list:
+            del_student = st.selectbox("اختر الطالب للحذف:", current_students_list, index=None, placeholder="اختر طالباً...", key="del_stu_sidebar")
             if st.button("🗑️ حذف الطالب المحدد", type="primary"):
                 if del_student:
                     cursor.execute("DELETE FROM students WHERE name = ?", (del_student,))
@@ -183,47 +183,122 @@ if st.session_state['role'] == 'admin':
                     st.success(f"تم حذف الطالب ({del_student}) وجميع سجلاته بنجاح!")
                     st.rerun()
 
-    with st.sidebar.expander("📥 استرداد وتنزيل البيانات (Backup)"):
-        backup_format = st.radio("اختر صيغة التنزيل:", ["Excel (.xlsx)", "PDF (.pdf)"], horizontal=True)
-        if st.button("تنزيل النسخة الاحتياطية الشاملة"):
-            df_att_all = pd.read_sql_query("SELECT * FROM attendance_records", conn)
-            df_hifz_all = pd.read_sql_query("SELECT * FROM hifz_records", conn)
-            df_rev_all = pd.read_sql_query("SELECT * FROM review_records", conn)
-            df_students_all = pd.read_sql_query("SELECT * FROM students", conn)
+    with st.sidebar.expander("📥 خيارات الاسترداد والتصدير الشاملة"):
+        export_format_choice = st.radio("اختر صيغة التنزيل:", ["Excel (.xlsx)", "PDF (.html/print)"], horizontal=True, key="sidebar_export_fmt")
+        
+        export_option = st.selectbox(
+            "اختر الكشف أو التقرير المراد استرداده وتنزيله:", 
+            [
+                "تنزيل قاعدة البيانات الشاملة (Backup)", 
+                "كشف الحضور والغياب الشبكي", 
+                "كشف الحفظ الشبكي", 
+                "كشف المراجعة الشبكي", 
+                "تقرير شخصي كامل لطالب محدد"
+            ],
+            key="sidebar_export_option"
+        )
 
-            if "Excel" in backup_format:
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df_students_all.to_excel(writer, index=False, sheet_name='الطلاب')
-                    df_att_all.to_excel(writer, index=False, sheet_name='الحضور')
-                    df_hifz_all.to_excel(writer, index=False, sheet_name='الحفظ')
-                    df_rev_all.to_excel(writer, index=False, sheet_name='المراجعة')
-                st.download_button(
-                    label="📥 اضغط هنا لتنزيل ملف Excel",
-                    data=output.getvalue(),
-                    file_name=f"Quran_Center_Backup_{date.today()}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            else:
-                # توليد تقرير نصي/HTML خفيف أو جدول للـ PDF
-                html_content = f"""
-                <html dir="rtl">
-                <head><meta charset="utf-8"><style>body{{font-family:Tahoma; direction:rtl; text-align:right;}} table{{width:100%; border-collapse:collapse;}} th, td{{border:1px solid #ddd; padding:8px; text-align:center;}} th{{background-color:#f2f2f2;}}</style></head>
-                <body>
-                <h2>تقرير النسخة الاحتياطية لمركز التحفيظ - {date.today()}</h2>
-                <h3>الطلاب المسجلون</h3>
-                {df_students_all.to_html(index=False)}
-                <h3>سجلات الحضور</h3>
-                {df_att_all.to_html(index=False)}
-                </body>
-                </html>
-                """
-                st.download_button(
-                    label="📥 اضغط هنا لتنزيل ملف النسخة الاحتياطية",
-                    data=html_content,
-                    file_name=f"Quran_Center_Backup_{date.today()}.html",
-                    mime="text/html"
-                )
+        cursor.execute("SELECT name FROM students ORDER BY name ASC")
+        all_students_sidebar = [row[0] for row in cursor.fetchall()]
+
+        if export_option == "تقرير شخصي كامل لطالب محدد":
+            single_student_sb = st.selectbox("🔎 اختر اسم الطالب لتنزيل ملفه الخاص:", all_students_sidebar, index=None, placeholder="اكتب اسم الطالب...", key="sb_single_stu")
+            if single_student_sb:
+                df_att_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student_sb}' ORDER BY date DESC", conn)
+                df_hifz_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student_sb}' ORDER BY date DESC", conn)
+                df_rev_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, amount AS حزب_المراجعة, rating AS التقييم FROM review_records WHERE student_name = '{single_student_sb}' ORDER BY date DESC", conn)
+                
+                if "Excel" in export_format_choice:
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        df_att_single.to_excel(writer, index=False, sheet_name='سجل_الحضور')
+                        df_hifz_single.to_excel(writer, index=False, sheet_name='سجل_الحفظ')
+                        df_rev_single.to_excel(writer, index=False, sheet_name='سجل_المراجعة')
+                    st.download_button(
+                        label=f"📥 تنزيل Excel لـ ({single_student_sb})", 
+                        data=output.getvalue(), 
+                        file_name=f"تقرير_{single_student_sb}_{date.today()}.xlsx", 
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                else:
+                    html_single = f"""
+                    <html dir="rtl"><head><meta charset="utf-8"><style>body{{font-family:Tahoma; text-align:right;}} table{{width:100%; border-collapse:collapse;}} th,td{{border:1px solid #ddd; padding:6px; text-align:center;}} th{{background:#eee;}}</style></head>
+                    <body><h2>تقرير الطالب: {single_student_sb}</h2>
+                    <h3>الحضور</h3>{df_att_single.to_html(index=False)}
+                    <h3>الحفظ</h3>{df_hifz_single.to_html(index=False)}
+                    <h3>المراجعة</h3>{df_rev_single.to_html(index=False)}</body></html>
+                    """
+                    st.download_button(label=f"📥 تنزيل PDF/HTML لـ ({single_student_sb})", data=html_single, file_name=f"تقرير_{single_student_sb}.html", mime="text/html")
+
+        elif export_option == "تنزيل قاعدة البيانات الشاملة (Backup)":
+            if st.button("تنزيل النسخة الاحتياطية الكاملة"):
+                df_att_all = pd.read_sql_query("SELECT * FROM attendance_records", conn)
+                df_hifz_all = pd.read_sql_query("SELECT * FROM hifz_records", conn)
+                df_rev_all = pd.read_sql_query("SELECT * FROM review_records", conn)
+                df_students_all = pd.read_sql_query("SELECT * FROM students", conn)
+
+                if "Excel" in export_format_choice:
+                    output_backup = io.BytesIO()
+                    with pd.ExcelWriter(output_backup, engine='openpyxl') as writer:
+                        df_students_all.to_excel(writer, index=False, sheet_name='الطلاب')
+                        df_att_all.to_excel(writer, index=False, sheet_name='السجل_اليومي_للحضور')
+                        df_hifz_all.to_excel(writer, index=False, sheet_name='سجل_الحفظ')
+                        df_rev_all.to_excel(writer, index=False, sheet_name='سجل_المراجعة')
+                    
+                    st.download_button(
+                        label="📥 تنزيل النسخة الاحتياطية (Excel)", 
+                        data=output_backup.getvalue(), 
+                        file_name=f"Bab_Al_Salam_Backup_{date.today()}.xlsx", 
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        type="primary"
+                    )
+                else:
+                    html_backup = f"""
+                    <html dir="rtl"><head><meta charset="utf-8"><style>body{{font-family:Tahoma; text-align:right;}} table{{width:100%; border-collapse:collapse;}} th,td{{border:1px solid #ddd; padding:6px; text-align:center;}} th{{background:#eee;}}</style></head>
+                    <body><h2>النسخة الاحتياطية الشاملة - {date.today()}</h2>
+                    <h3>الطلاب</h3>{df_students_all.to_html(index=False)}
+                    <h3>الحضور</h3>{df_att_all.to_html(index=False)}
+                    <h3>الحفظ</h3>{df_hifz_all.to_html(index=False)}
+                    <h3>المراجعة</h3>{df_rev_all.to_html(index=False)}</body></html>
+                    """
+                    st.download_button(label="📥 تنزيل النسخة الاحتياطية (PDF/HTML)", data=html_backup, file_name=f"Backup_{date.today()}.html", mime="text/html")
+
+        elif export_option == "كشف الحضور والغياب الشبكي":
+            df_att_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records", conn)
+            df_pivot = df_att_raw.pivot_table(index='التاريخ', columns='الطالب', values='الحالة', aggfunc='first').reset_index() if not df_att_raw.empty else pd.DataFrame(columns=["التاريخ"])
+            st.dataframe(df_pivot, use_container_width=True, hide_index=True)
+            if not df_pivot.empty:
+                if "Excel" in export_format_choice:
+                    out_p = io.BytesIO()
+                    df_pivot.to_excel(out_p, index=False)
+                    st.download_button("📥 تحميل الكشف كـ Excel", out_p.getvalue(), "كشف_الحضور.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                else:
+                    st.download_button("📥 تحميل الكشف كـ HTML/PDF", df_pivot.to_html(index=False), "كشف_الحضور.html", "text/html")
+
+        elif export_option == "كشف الحفظ الشبكي":
+            df_hifz_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records", conn)
+            df_pivot = df_hifz_raw.pivot_table(index='التاريخ', columns='الطالب', values='التقييم', aggfunc='first').reset_index() if not df_hifz_raw.empty else pd.DataFrame(columns=["التاريخ"])
+            st.dataframe(df_pivot, use_container_width=True, hide_index=True)
+            if not df_pivot.empty:
+                if "Excel" in export_format_choice:
+                    out_p = io.BytesIO()
+                    df_pivot.to_excel(out_p, index=False)
+                    st.download_button("📥 تحميل الكشف كـ Excel", out_p.getvalue(), "كشف_الحفظ.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                else:
+                    st.download_button("📥 تحميل الكشف كـ HTML/PDF", df_pivot.to_html(index=False), "كشف_الحفظ.html", "text/html")
+
+        elif export_option == "كشف المراجعة الشبكي":
+            df_rev_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, (amount || ' [' || rating || ']') AS المراجعة FROM review_records", conn)
+            df_pivot = df_rev_raw.pivot_table(index='التاريخ', columns='الطالب', values='المراجعة', aggfunc='first').reset_index() if not df_rev_raw.empty else pd.DataFrame(columns=["التاريخ"])
+            st.dataframe(df_pivot, use_container_width=True, hide_index=True)
+            if not df_pivot.empty:
+                if "Excel" in export_format_choice:
+                    out_p = io.BytesIO()
+                    df_pivot.to_excel(out_p, index=False)
+                    st.download_button("📥 تحميل الكشف كـ Excel", out_p.getvalue(), "كشف_المراجعة.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                else:
+                    st.download_button("📥 تحميل الكشف كـ HTML/PDF", df_pivot.to_html(index=False), "كشف_المراجعة.html", "text/html")
+
     st.sidebar.divider()
 
 st.title("📖 برنامج إدارة مركز التحفيظ")
