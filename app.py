@@ -118,7 +118,6 @@ st.markdown("""
         text-align: right !important; 
     }
     
-    /* تقليل المسافات والفراغات بين العناصر في كشف الحضور */
     div.row-widget.stHorizontal {
         gap: 5px !important;
         align-items: center !important;
@@ -146,7 +145,6 @@ st.markdown("""
         font-size: 24px;
     }
 
-    /* تنسيق الجداول المخصصة */
     .custom-table {
         width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 15px; text-align: center; direction: rtl; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     }
@@ -154,10 +152,10 @@ st.markdown("""
     .custom-table td { padding: 12px; border-bottom: 1px solid #edf2f7; color: #1e293b; }
     .custom-table tr:nth-of-type(even) { background-color: #f8fafc; }
     
-    /* شارات التقييم الملونة */
     .badge-good { background-color: #d1fae5; color: #065f46; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 13px; display: inline-block; }
     .badge-retry { background-color: #fee2e2; color: #991b1b; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 13px; display: inline-block; }
     .badge-absent { background-color: #f1f5f9; color: #475569; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 13px; display: inline-block; }
+    .badge-none { background-color: #fef3c7; color: #92400e; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 13px; display: inline-block; }
     
     div.stButton > button {
         border-radius: 10px;
@@ -405,6 +403,31 @@ else:
         entry_date = date.today()
         st.caption(f"📅 تاريخ التسجيل اليوم: *{entry_date}*")
 
+    # زر لإغلاق اليوم وتعبئة السجلات الفارغة بـ "لم يسمع" تلقائياً
+    if st.button("🔒 إغلاق اليوم وترصيد السجلات الفارغة بـ (لم يسمع)", help="يقوم هذا الزر بفحص جميع الطلاب الحاضرين في هذا اليوم ومن لم يتم تقييمه في الحفظ أو المراجعة يتم رصدها تلقائياً بكلمة لم يسمع"):
+        cursor.execute("SELECT student_name FROM attendance_records WHERE date = ? AND status = 'حضور'", (str(entry_date),))
+        present_students = [row[0] for row in cursor.fetchall()]
+        
+        updated_count = 0
+        for s_name in present_students:
+            # التحقق من سجل الحفظ لهذا اليوم
+            cursor.execute("SELECT id FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), s_name))
+            if not cursor.fetchone():
+                cursor.execute("INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating) VALUES (?, ?, ?, ?, ?, ?)", (str(entry_date), s_name, "-", 0, 0, "لم يسمع"))
+                updated_count += 1
+            
+            # التحقق من سجل المراجعة لهذا اليوم
+            cursor.execute("SELECT id FROM review_records WHERE date = ? AND student_name = ?", (str(entry_date), s_name))
+            if not cursor.fetchone():
+                cursor.execute("INSERT INTO review_records (date, student_name, amount, rating) VALUES (?, ?, ?, ?)", (str(entry_date), s_name, "لم يسمع", "لم يسمع"))
+                updated_count += 1
+        
+        conn.commit()
+        if updated_count > 0:
+            st.success(f"✅ تم إغلاق اليوم وترصيد الحالات الفارغة بـ (لم يسمع) بنجاح لـ {updated_count} سجل!")
+        else:
+            st.info("جميع الطلاب الحاضرين مسجلة تقييماتهم مسبقاً ولا توجد حالات فارغة.")
+
     st.divider()
 
     tab1, tab2, tab3, tab4 = st.tabs(["📝 الحضور والغياب الجماعي", "📖 الحفظ الجديد", "🔄 المراجعة", "🎯 متابعة تسلسل الأحزاب"])
@@ -417,7 +440,6 @@ else:
         attendance_results = {}
         status_options = ["حضور", "غياب", "غياب بعذر", "تأخير"]
 
-        # عرض مضغوط للأسماء في صفوف مرتبة لتقليل التباعد وعرض أكبر عدد من الطلاب
         for idx, student in enumerate(filtered_att_students):
             col_name, col_status = st.columns([1.2, 2.8])
             with col_name:
@@ -460,7 +482,7 @@ else:
                 conn.commit()
             else:
                 st.success(f"تم اختيار الطالب: *{selected_student_hifz}*")
-                hifz_rating = st.radio("تقييم الحفظ اليوم:", ["جيد", "إعادة", "غائب"], horizontal=True, key="hifz_rate")
+                hifz_rating = st.radio("تقييم الحفظ اليوم:", ["جيد", "إعادة", "لم يسمع", "غائب"], horizontal=True, key="hifz_rate")
                 
                 if st.button("حفظ التسميع 💾", key="save_hifz", type="primary", use_container_width=True):
                     cursor.execute("DELETE FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_hifz))
@@ -476,7 +498,14 @@ else:
             if not df_student_hifz.empty:
                 html_table = "<table class='custom-table'><thead><tr><th>التاريخ</th><th>التقييم</th></tr></thead><tbody>"
                 for _, row in df_student_hifz.iterrows():
-                    badge = "badge-good" if row['التقييم'] == "جيد" else ("badge-retry" if row['التقييم'] == "إعادة" else "badge-absent")
+                    if row['التقييم'] == "جيد":
+                        badge = "badge-good"
+                    elif row['التقييم'] == "إعادة":
+                        badge = "badge-retry"
+                    elif row['التقييم'] == "لم يسمع":
+                        badge = "badge-none"
+                    else:
+                        badge = "badge-absent"
                     html_table += f"<tr><td>{row['التاريخ']}</td><td><span class='{badge}'>{row['التقييم']}</span></td></tr>"
                 html_table += "</tbody></table>"
                 st.markdown(html_table, unsafe_allow_html=True)
@@ -497,39 +526,51 @@ else:
                 conn.commit()
             else:
                 st.success(f"تم اختيار الطالب: *{selected_student_rev}*")
-                if "selected_hizb" not in st.session_state:
-                    st.session_state["selected_hizb"] = None
-                if "show_hizb_grid" not in st.session_state:
-                    st.session_state["show_hizb_grid"] = False
-
-                st.write("📖 *حزب المراجعة:*")
-                current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب (تنازلياً) 🔻"
-                if st.button(f"🟢 {current_hizb_text}", use_container_width=True, key="toggle_hizb_btn"):
-                    st.session_state["show_hizb_grid"] = not st.session_state["show_hizb_grid"]
-                    st.rerun()
-
-                if st.session_state["show_hizb_grid"]:
-                    st.info("اضغط على اسم الحزب لاختياره مباشرة (الترتيب تنازلي من النهاية للبداية):")
-                    for idx, hizb in enumerate(AHZAB_LIST_DESC):
-                        if st.button(hizb, key=f"hizb_btn_{idx}", use_container_width=True):
-                            st.session_state["selected_hizb"] = hizb
-                            st.session_state["show_hizb_grid"] = False
-                            st.rerun()
-
-                review_hizb = st.session_state["selected_hizb"]
-                if review_hizb:
-                    st.success(f"تم تحديد الحزب: *{review_hizb}*")
-                    review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
-                    
-                    if st.button("حفظ المراجعة 💾", key="save_rev", type="primary", use_container_width=True):
+                
+                # إضافة خيار "لم يسمع" كحالة سريعة مباشرة بدون الحاجة لاختيار حزب
+                quick_not_called = st.checkbox("تعيين الحالة مباشرة كـ (لم يسمع)", key="quick_not_called_box")
+                
+                if quick_not_called:
+                    if st.button("حفظ كـ (لم يسمع) 💾", key="save_rev_none", type="primary", use_container_width=True):
                         cursor.execute("DELETE FROM review_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_rev))
-                        cursor.execute("INSERT INTO review_records (date, student_name, amount, rating) VALUES (?, ?, ?, ?)", (str(entry_date), selected_student_rev, review_hizb, review_rating))
+                        cursor.execute("INSERT INTO review_records (date, student_name, amount, rating) VALUES (?, ?, ?, ?)", (str(entry_date), selected_student_rev, "لم يسمع", "لم يسمع"))
                         conn.commit()
-                        st.success(f"تم تحديث مراجعة الطالب ({selected_student_rev}) بنجاح!")
-                        st.session_state["selected_hizb"] = None
+                        st.success(f"تم تحديث مراجعة الطالب ({selected_student_rev}) إلى (لم يسمع) بنجاح!")
                         st.rerun()
                 else:
-                    st.warning("⚠️ يرجى اختيار الحزب أولاً قبل حفظ المراجعة.")
+                    if "selected_hizb" not in st.session_state:
+                        st.session_state["selected_hizb"] = None
+                    if "show_hizb_grid" not in st.session_state:
+                        st.session_state["show_hizb_grid"] = False
+
+                    st.write("📖 *حزب المراجعة:*")
+                    current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب (تنازلياً) 🔻"
+                    if st.button(f"🟢 {current_hizb_text}", use_container_width=True, key="toggle_hizb_btn"):
+                        st.session_state["show_hizb_grid"] = not st.session_state["show_hizb_grid"]
+                        st.rerun()
+
+                    if st.session_state["show_hizb_grid"]:
+                        st.info("اضغط على اسم الحزب لاختياره مباشرة (الترتيب تنازلي من النهاية للبداية):")
+                        for idx, hizb in enumerate(AHZAB_LIST_DESC):
+                            if st.button(hizb, key=f"hizb_btn_{idx}", use_container_width=True):
+                                st.session_state["selected_hizb"] = hizb
+                                st.session_state["show_hizb_grid"] = False
+                                st.rerun()
+
+                    review_hizb = st.session_state["selected_hizb"]
+                    if review_hizb:
+                        st.success(f"تم تحديد الحزب: *{review_hizb}*")
+                        review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة", "لم يسمع"], horizontal=True, key="rev_rate")
+                        
+                        if st.button("حفظ المراجعة 💾", key="save_rev", type="primary", use_container_width=True):
+                            cursor.execute("DELETE FROM review_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_rev))
+                            cursor.execute("INSERT INTO review_records (date, student_name, amount, rating) VALUES (?, ?, ?, ?)", (str(entry_date), selected_student_rev, review_hizb, review_rating))
+                            conn.commit()
+                            st.success(f"تم تحديث مراجعة الطالب ({selected_student_rev}) بنجاح!")
+                            st.session_state["selected_hizb"] = None
+                            st.rerun()
+                    else:
+                        st.warning("⚠️ يرجى اختيار الحزب أولاً قبل حفظ المراجعة أو تفعيل خيار (لم يسمع).")
 
             st.divider()
             st.markdown(f"#### 📊 سجل مراجعة الطالب (آخر 10 نتائج): *{selected_student_rev}*")
@@ -538,7 +579,14 @@ else:
             if not df_student_rev.empty:
                 html_table = "<table class='custom-table'><thead><tr><th>التاريخ</th><th>حزب المراجعة</th><th>التقييم</th></tr></thead><tbody>"
                 for _, row in df_student_rev.iterrows():
-                    badge = "badge-good" if row['التقييم'] == "جيد" else ("badge-retry" if row['التقييم'] == "إعادة" else "badge-absent")
+                    if row['التقييم'] == "جيد":
+                        badge = "badge-good"
+                    elif row['التقييم'] == "إعادة":
+                        badge = "badge-retry"
+                    elif row['التقييم'] == "لم يسمع":
+                        badge = "badge-none"
+                    else:
+                        badge = "badge-absent"
                     html_table += f"<tr><td>{row['التاريخ']}</td><td>{row['حزب_المراجعة']}</td><td><span class='{badge}'>{row['التقييم']}</span></td></tr>"
                 html_table += "</tbody></table>"
                 st.markdown(html_table, unsafe_allow_html=True)
