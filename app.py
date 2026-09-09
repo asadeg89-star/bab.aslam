@@ -67,7 +67,7 @@ conn.commit()
 
 st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
 
-# تنسيق الاتجاه RTL وجداول المخصص للهواتف
+# تنسيق الاتجاه RTL والجدول المخصص للهواتف
 st.markdown("""
     <style>
     .stMainBlockContainer { direction: rtl !important; text-align: right !important; }
@@ -78,7 +78,7 @@ st.markdown("""
     section[data-testid="stSidebar"] { direction: ltr !important; }
     section[data-testid="stSidebar"] * { direction: rtl !important; text-align: right !important; }
     
-    /* تنسيق جدول HTML المخصص */
+    /* تنسيق جدول HTML المخصص للهواتف */
     .custom-table {
         width: 100%;
         border-collapse: collapse;
@@ -396,16 +396,16 @@ else:
 
             st.divider()
 
-            st.markdown(f"#### 📊 سجل إنجاز الطالب: *{selected_student_hifz}*")
+            st.markdown(f"#### 📊 سجل إنجاز الطالب (آخر 10 نتائج): *{selected_student_hifz}*")
 
-            # جلب البيانات مرتبة من الأحدث إلى الأقدم بحسب التاريخ
+            # جلب آخر 10 سجلات فقط مرتبة من الأحدث إلى الأقدم بحسب التاريخ
             df_student_hifz = pd.read_sql_query(
-                "SELECT date AS التاريخ, rating AS التقييم FROM hifz_records WHERE student_name = ? ORDER BY date DESC, id DESC",
+                "SELECT date AS التاريخ, rating AS التقييم FROM hifz_records WHERE student_name = ? ORDER BY date DESC, id DESC LIMIT 10",
                 conn, params=(selected_student_hifz,)
             )
 
             if not df_student_hifz.empty:
-                # إنشاء جدول HTML ثنائي الأبعاد يتطابق مع الشاشة
+                # جدول HTML مخصص بدون مشاكل اقتطاع الشاشة
                 html_table = "<table class='custom-table'><thead><tr><th>التاريخ</th><th>التقييم</th></tr></thead><tbody>"
                 for _, row in df_student_hifz.iterrows():
                     badge = "badge-good" if row['التقييم'] == "جيد" else "badge-retry"
@@ -416,7 +416,7 @@ else:
 
                 st.divider()
 
-                # الرسم البياني
+                # الرسم البياني لآخر 10 نتائج
                 rating_counts = df_student_hifz['التقييم'].value_counts().reset_index()
                 rating_counts.columns = ['التقييم', 'العدد']
 
