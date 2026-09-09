@@ -128,6 +128,28 @@ CREATE TABLE IF NOT EXISTS review_records (
 """)
 conn.commit()
 
+# --- تنظيف البيانات القديمة المكررة تلقائياً عند التشغيل ---
+cursor.execute("""
+DELETE FROM attendance_records 
+WHERE id NOT IN (
+    SELECT MAX(id) FROM attendance_records GROUP BY date, student_name
+)
+""")
+cursor.execute("""
+DELETE FROM hifz_records 
+WHERE id NOT IN (
+    SELECT MAX(id) FROM hifz_records GROUP BY date, student_name
+)
+""")
+cursor.execute("""
+DELETE FROM review_records 
+WHERE id NOT IN (
+    SELECT MAX(id) FROM review_records GROUP BY date, student_name
+)
+""")
+conn.commit()
+# --------------------------------------------------------
+
 # تنسيق الاتجاه RTL وتنسيق الجدول
 st.markdown("""
     <style>
@@ -308,7 +330,7 @@ else:
     tab1, tab2, tab3 = st.tabs(["📝 الحضور والغياب المجمع والتصدير", "📖 الحفظ الجديد", "🔄 المراجعة"])
 
     # --------------------------------------------------
-    # TAB 1: الحضور والغياب (حذف القديم لنفس اليوم ثم إدخال الجديد)
+    # TAB 1: الحضور والغياب
     # --------------------------------------------------
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
@@ -333,7 +355,6 @@ else:
 
         if st.button("💾 حفظ كشف الحضور لجميع الطلاب الظاهرين", type="primary"):
             for student_name, status in attendance_results.items():
-                # حذف أي سجل قديم لنفس الطالب في نفس اليوم لضمان بقاء سجل واحد فقط
                 cursor.execute("DELETE FROM attendance_records WHERE date = ? AND student_name = ?", (str(entry_date), student_name))
                 cursor.execute("""
                     INSERT INTO attendance_records (date, student_name, status)
@@ -392,7 +413,7 @@ else:
             st.dataframe(df_pivot, use_container_width=True, hide_index=True)
 
     # --------------------------------------------------
-    # TAB 2: الحفظ الجديد (حذف القديم لنفس اليوم ثم إدخال الجديد)
+    # TAB 2: الحفظ الجديد
     # --------------------------------------------------
     with tab2:
         st.markdown("### 📖 تسجيل الحفظ الجديد")
@@ -403,7 +424,6 @@ else:
             hifz_rating = st.radio("تقييم الحفظ اليوم:", ["جيد", "إعادة", "غائب"], horizontal=True, key="hifz_rate")
             
             if st.button("حفظ التسميع 💾", key="save_hifz", type="primary"):
-                # حذف السجل القديم لنفس اليوم ثم إدراج الجديد ليصبح الإدخال أحدث وأوحد
                 cursor.execute("DELETE FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_hifz))
                 cursor.execute("""
                     INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
@@ -443,7 +463,7 @@ else:
                 st.altair_chart((bars + text).properties(height=280), use_container_width=True)
 
     # --------------------------------------------------
-    # TAB 3: المراجعة (حذف القديم لنفس اليوم ثم إدخال الجديد)
+    # TAB 3: المراجعة
     # --------------------------------------------------
     with tab3:
         st.markdown("### 🔄 تسجيل المراجعة")
@@ -478,7 +498,6 @@ else:
                 review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
                 
                 if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
-                    # حذف السجل القديم لنفس اليوم ثم إدراج الجديد لضمان بقاء سجل واحد فقط
                     cursor.execute("DELETE FROM review_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_rev))
                     cursor.execute("""
                         INSERT INTO review_records (date, student_name, amount, rating)
