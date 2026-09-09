@@ -67,7 +67,7 @@ conn.commit()
 
 st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
 
-# تنسيق الاتجاه RTL وتعديل عرض جداول البيانات لتناسب الهواتف
+# تنسيق الاتجاه RTL وجداول المخصص للهواتف
 st.markdown("""
     <style>
     .stMainBlockContainer { direction: rtl !important; text-align: right !important; }
@@ -78,10 +78,45 @@ st.markdown("""
     section[data-testid="stSidebar"] { direction: ltr !important; }
     section[data-testid="stSidebar"] * { direction: rtl !important; text-align: right !important; }
     
-    /* تنسيق جدول البيانات ليظهر بشكل واضح ومناسب للشاشات الصغيرة */
-    [data-testid="stDataFrame"] {
-        direction: rtl !important;
-        width: 100% !important;
+    /* تنسيق جدول HTML المخصص */
+    .custom-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 15px 0;
+        font-size: 15px;
+        text-align: center;
+        direction: rtl;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .custom-table th {
+        background-color: #f8f9fa;
+        color: #333;
+        font-weight: bold;
+        padding: 10px;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .custom-table td {
+        padding: 10px;
+        border-bottom: 1px solid #e9ecef;
+    }
+    .custom-table tr:nth-of-type(even) {
+        background-color: #fdfdfd;
+    }
+    .badge-good {
+        background-color: #d1fae5;
+        color: #065f46;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-weight: bold;
+    }
+    .badge-retry {
+        background-color: #fee2e2;
+        color: #991b1b;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-weight: bold;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -370,16 +405,14 @@ else:
             )
 
             if not df_student_hifz.empty:
-                # عرض الجدول باستخدام st.dataframe المنسق صراحة لتوزيع المساحة 50% لكل عمود
-                st.dataframe(
-                    df_student_hifz,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "التاريخ": st.column_config.TextColumn("التاريخ", width="medium"),
-                        "التقييم": st.column_config.TextColumn("التقييم", width="medium"),
-                    }
-                )
+                # إنشاء جدول HTML ثنائي الأبعاد يتطابق مع الشاشة
+                html_table = "<table class='custom-table'><thead><tr><th>التاريخ</th><th>التقييم</th></tr></thead><tbody>"
+                for _, row in df_student_hifz.iterrows():
+                    badge = "badge-good" if row['التقييم'] == "جيد" else "badge-retry"
+                    html_table += f"<tr><td>{row['التاريخ']}</td><td><span class='{badge}'>{row['التقييم']}</span></td></tr>"
+                html_table += "</tbody></table>"
+
+                st.markdown(html_table, unsafe_allow_html=True)
 
                 st.divider()
 
