@@ -71,7 +71,7 @@ AHZAB_LIST = [
     "الفاتحة"
 ]
 
-# 2. إعداد قاعدة البيانات وتأسيس الجداول
+# 2. إعداد قاعدة البيانات وتأسيس الجداول (مع تحديد UNIQUE لمنع تكرار نفس الطالب في نفس اليوم)
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
 cursor = conn.cursor()
 
@@ -96,12 +96,14 @@ CREATE TABLE IF NOT EXISTS students (
 )
 """)
 
+# إضافة UNIQUE(date, student_name) لضمان سجل واحد لكل يوم لكل طالب
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS attendance_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT,
     student_name TEXT,
-    status TEXT
+    status TEXT,
+    UNIQUE(date, student_name)
 )
 """)
 
@@ -113,7 +115,8 @@ CREATE TABLE IF NOT EXISTS hifz_records (
     surah TEXT,
     from_ayah INTEGER,
     to_ayah INTEGER,
-    rating TEXT
+    rating TEXT,
+    UNIQUE(date, student_name)
 )
 """)
 
@@ -123,7 +126,8 @@ CREATE TABLE IF NOT EXISTS review_records (
     date TEXT,
     student_name TEXT,
     amount TEXT,
-    rating TEXT
+    rating TEXT,
+    UNIQUE(date, student_name)
 )
 """)
 conn.commit()
@@ -246,7 +250,7 @@ st.sidebar.divider()
 st.title("📖 برنامج إدارة مركز التحفيظ")
 
 # --------------------------------------------------
-# قسم إدارة المستخدمين (للمستخدم الرئيسي Admin فقط)
+# إدارة المستخدمين والطلاب
 # --------------------------------------------------
 if st.session_state["role"] == "admin":
     st.sidebar.header("👑 إدارة حسابات المستخدمين")
@@ -263,14 +267,9 @@ if st.session_state["role"] == "admin":
                 st.sidebar.error("اسم المستخدم هذا مسجل مسبقاً.")
         else:
             st.sidebar.warning("يرجى ملء كافة البيانات.")
-
     st.sidebar.divider()
 
-# --------------------------------------------------
-# إدارة الطلاب
-# --------------------------------------------------
 st.sidebar.header("⚙️ إدارة الطلاب")
-
 if st.session_state["role"] == "admin":
     st.sidebar.subheader("➕ إضافة طالب جديد")
     new_student = st.sidebar.text_input("اسم الطالب الجديد:")
@@ -285,31 +284,21 @@ if st.session_state["role"] == "admin":
                 st.sidebar.error("هذا الاسم موجود بالفعل!")
         else:
             st.sidebar.warning("يرجى كتابة اسم الطالب.")
-
     st.sidebar.divider()
 
-# جلب قائمة الطلاب
 cursor.execute("SELECT name FROM students ORDER BY name ASC")
 students_list = [row[0] for row in cursor.fetchall()]
 
 if st.session_state["role"] == "admin":
     st.sidebar.subheader("🗑️ إزالة طالب")
     if students_list:
-        student_to_remove = st.sidebar.selectbox(
-            "اختر الطالب المراد إزالته:",
-            students_list,
-            index=None,
-            placeholder="اختر الطالب للحذف...",
-            key="remove_select"
-        )
+        student_to_remove = st.sidebar.selectbox("اختر الطالب المراد إزالته:", students_list, index=None, placeholder="اختر الطالب للحذف...", key="remove_select")
         if st.sidebar.button("حذف الطالب", type="secondary"):
             if student_to_remove:
                 cursor.execute("DELETE FROM students WHERE name = ?", (student_to_remove,))
                 conn.commit()
                 st.sidebar.success(f"تمت إزالة الطالب ({student_to_remove}) بنجاح!")
                 st.rerun()
-            else:
-                st.sidebar.warning("يرجى اختيار طالب أولاً لإزالته.")
 
 # --------------------------------------------------
 # الواجهة الرئيسية لتسجيل البيانات
@@ -323,7 +312,7 @@ else:
     tab1, tab2, tab3 = st.tabs(["📝 الحضور والغياب المجمع والتصدير", "📖 الحفظ الجديد", "🔄 المراجعة"])
 
     # --------------------------------------------------
-    # TAB 1: الحضور والغياب وتصدير البيانات
+    # TAB 1: الحضور والغياب (مع استبدال السجل القديم بنظام INSERT OR REPLACE)
     # --------------------------------------------------
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
@@ -348,45 +337,33 @@ else:
 
         if st.button("💾 حفظ كشف الحضور لجميع الطلاب الظاهرين", type="primary"):
             for student_name, status in attendance_results.items():
+                # استخدام INSERT OR REPLACE لتحديث حالة الحضور إذا تم إدخالها مسبقاً في نفس اليوم
                 cursor.execute("""
-                    INSERT INTO attendance_records (date, student_name, status)
+                    INSERT OR REPLACE INTO attendance_records (date, student_name, status)
                     VALUES (?, ?, ?)
                 """, (str(entry_date), student_name, status))
                 
                 if status in ["غياب", "غياب بعذر"]:
                     cursor.execute("""
-                        INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
+                        INSERT OR REPLACE INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
                         VALUES (?, ?, ?, ?, ?, ?)
                     """, (str(entry_date), student_name, "-", 0, 0, "غائب"))
                     
                     cursor.execute("""
-                        INSERT INTO review_records (date, student_name, amount, rating)
+                        INSERT OR REPLACE INTO review_records (date, student_name, amount, rating)
                         VALUES (?, ?, ?, ?)
                     """, (str(entry_date), student_name, "غائب", "غائب"))
                     
             conn.commit()
-            st.success("✅ تم حفظ كشف الحضور وتحديث السجلات المرتبطة بالغياب بنجاح!")
+            st.success("✅ تم حفظ كشف الحضور وتحديث السجلات بنجاح!")
 
-        # --------------------------------------------------
-        # قسم تصدير البيانات إلى Excel
-        # --------------------------------------------------
+        # تصدير البيانات إلى Excel
         st.divider()
         st.subheader("📊 تصدير السجلات إلى ملف Excel")
-        
-        export_option = st.selectbox(
-            "اختر نوع الكشف المراد معاينته وتنزيله:",
-            ["كشف الحضور والغياب الشبكي", "كشف الحفظ الشبكي", "كشف المراجعة الشبكي", "تقرير شخصي كامل لطالب محدد"]
-        )
+        export_option = st.selectbox("اختر نوع الكشف المراد معاينته وتنزيله:", ["كشف الحضور والغياب الشبكي", "كشف الحفظ الشبكي", "كشف المراجعة الشبكي", "تقرير شخصي كامل لطالب محدد"])
 
         if export_option == "تقرير شخصي كامل لطالب محدد":
-            single_student = st.selectbox(
-                "🔎 اختر اسم الطالب لتنزيل ملفه الخاص:",
-                students_list,
-                index=None,
-                placeholder="اضغط واكتب اسم الطالب...",
-                key="export_single_search"
-            )
-            
+            single_student = st.selectbox("🔎 اختر اسم الطالب لتنزيل ملفه الخاص:", students_list, index=None, placeholder="اضغط واكتب اسم الطالب...", key="export_single_search")
             if single_student:
                 df_att_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
                 df_hifz_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
@@ -397,158 +374,80 @@ else:
                     df_att_single.to_excel(writer, index=False, sheet_name='سجل_الحضور')
                     df_hifz_single.to_excel(writer, index=False, sheet_name='سجل_الحفظ')
                     df_rev_single.to_excel(writer, index=False, sheet_name='سجل_المراجعة')
-                excel_data = output.getvalue()
                 
-                st.download_button(
-                    label=f"📥 تنزيل ملف Excel الشامل لـ ({single_student})",
-                    data=excel_data,
-                    file_name=f"تقرير_{single_student}_{date.today()}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                st.download_button(label=f"📥 تنزيل ملف Excel الشامل لـ ({single_student})", data=output.getvalue(), file_name=f"تقرير_{single_student}_{date.today()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
         elif export_option == "كشف الحضور والغياب الشبكي":
             df_att_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records", conn)
             df_pivot = df_att_raw.pivot_table(index='التاريخ', columns='الطالب', values='الحالة', aggfunc='first').reset_index() if not df_att_raw.empty else pd.DataFrame(columns=["التاريخ"])
-            
             st.dataframe(df_pivot, use_container_width=True, hide_index=True)
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_pivot.to_excel(writer, index=False, sheet_name='كشف_الحضور')
-            
-            st.download_button(
-                label="📥 تنزيل كشف الحضور والغياب الشبكي",
-                data=output.getvalue(),
-                file_name=f"كشف_الحضور_{date.today()}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
 
         elif export_option == "كشف الحفظ الشبكي":
             df_hifz_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records", conn)
             df_pivot = df_hifz_raw.pivot_table(index='التاريخ', columns='الطالب', values='التقييم', aggfunc='first').reset_index() if not df_hifz_raw.empty else pd.DataFrame(columns=["التاريخ"])
-            
             st.dataframe(df_pivot, use_container_width=True, hide_index=True)
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_pivot.to_excel(writer, index=False, sheet_name='كشف_الحفظ')
-            
-            st.download_button(
-                label="📥 تنزيل كشف الحفظ الشبكي",
-                data=output.getvalue(),
-                file_name=f"كشف_الحفظ_{date.today()}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
 
         elif export_option == "كشف المراجعة الشبكي":
             df_rev_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, (amount || ' [' || rating || ']') AS المراجعة FROM review_records", conn)
             df_pivot = df_rev_raw.pivot_table(index='التاريخ', columns='الطالب', values='المراجعة', aggfunc='first').reset_index() if not df_rev_raw.empty else pd.DataFrame(columns=["التاريخ"])
-            
             st.dataframe(df_pivot, use_container_width=True, hide_index=True)
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_pivot.to_excel(writer, index=False, sheet_name='كشف_المراجعة')
-            
-            st.download_button(
-                label="📥 تنزيل كشف المراجعة الشبكي",
-                data=output.getvalue(),
-                file_name=f"كشف_المراجعة_{date.today()}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
 
     # --------------------------------------------------
-    # TAB 2: الحفظ الجديد
+    # TAB 2: الحفظ الجديد (مع استبدال السجل القديم بنظام INSERT OR REPLACE)
     # --------------------------------------------------
     with tab2:
         st.markdown("### 📖 تسجيل الحفظ الجديد")
-        
-        selected_student_hifz = st.selectbox(
-            "🔍 اختر اسم الطالب أو اكتب للبحث:",
-            students_list,
-            index=None,
-            placeholder="اضغط لاختيار الطالب أو اكتب اسمه...",
-            key="hifz_select_student"
-        )
+        selected_student_hifz = st.selectbox("🔍 اختر اسم الطالب أو اكتب للبحث:", students_list, index=None, placeholder="اضغط لاختيار الطالب أو اكتب اسمه...", key="hifz_select_student")
         
         if selected_student_hifz:
             st.success(f"تم اختيار الطالب: *{selected_student_hifz}*")
-            
             hifz_rating = st.radio("تقييم الحفظ اليوم:", ["جيد", "إعادة", "غائب"], horizontal=True, key="hifz_rate")
             
             if st.button("حفظ التسميع 💾", key="save_hifz", type="primary"):
+                # استبدال السجل القديم لنفس اليوم إذا أُدخل مرة أخرى
                 cursor.execute("""
-                    INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
+                    INSERT OR REPLACE INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
                     VALUES (?, ?, ?, ?, ?, ?)
                 """, (str(entry_date), selected_student_hifz, "-", 0, 0, hifz_rating))
                 conn.commit()
-                st.success(f"تم حفظ تسميع الطالب ({selected_student_hifz})!")
+                st.success(f"تم تحديث حفظ الطالب ({selected_student_hifz}) بنجاح!")
                 st.rerun()
 
             st.divider()
-
             st.markdown(f"#### 📊 سجل إنجاز الطالب (آخر 10 نتائج): *{selected_student_hifz}*")
 
             df_student_hifz = pd.read_sql_query(
-                "SELECT date AS التاريخ, rating AS التقييم FROM hifz_records WHERE student_name = ? ORDER BY date DESC, id DESC LIMIT 10",
+                "SELECT date AS التاريخ, rating AS التقييم FROM hifz_records WHERE student_name = ? ORDER BY date DESC LIMIT 10",
                 conn, params=(selected_student_hifz,)
             )
 
             if not df_student_hifz.empty:
                 html_table = "<table class='custom-table'><thead><tr><th>التاريخ</th><th>التقييم</th></tr></thead><tbody>"
                 for _, row in df_student_hifz.iterrows():
-                    if row['التقييم'] == "جيد":
-                        badge = "badge-good"
-                    elif row['التقييم'] == "إعادة":
-                        badge = "badge-retry"
-                    else:
-                        badge = "badge-absent"
+                    badge = "badge-good" if row['التقييم'] == "جيد" else ("badge-retry" if row['التقييم'] == "إعادة" else "badge-absent")
                     html_table += f"<tr><td>{row['التاريخ']}</td><td><span class='{badge}'>{row['التقييم']}</span></td></tr>"
                 html_table += "</tbody></table>"
-
                 st.markdown(html_table, unsafe_allow_html=True)
 
                 st.divider()
-
                 rating_counts = df_student_hifz['التقييم'].value_counts().reset_index()
                 rating_counts.columns = ['التقييم', 'العدد']
 
-                bars = alt.Chart(rating_counts).mark_bar(
-                    cornerRadiusTopLeft=10,
-                    cornerRadiusTopRight=10,
-                    width=60
-                ).encode(
+                bars = alt.Chart(rating_counts).mark_bar(cornerRadiusTopLeft=10, cornerRadiusTopRight=10, width=60).encode(
                     x=alt.X('التقييم:N', title='نوع التقييم', axis=alt.Axis(labelAngle=0, labelFontSize=14, titleFontSize=14)),
                     y=alt.Y('العدد:Q', title='عدد المرات', axis=alt.Axis(labelFontSize=12, titleFontSize=14)),
                     color=alt.Color('التقييم:N', scale=alt.Scale(domain=['جيد', 'إعادة', 'غائب'], range=['#10b981', '#ef4444', '#6b7280']), legend=None),
                     tooltip=['التقييم', 'العدد']
                 )
-
-                text = bars.mark_text(
-                    align='center',
-                    baseline='bottom',
-                    dy=-5,
-                    fontSize=14,
-                    fontWeight='bold'
-                ).encode(
-                    text='العدد:Q'
-                )
-
-                chart = (bars + text).properties(height=280)
-
-                st.altair_chart(chart, use_container_width=True)
-            else:
-                st.info("لا توجد سجلات حفظ سابقة لهذا الطالب حتى الآن.")
+                text = bars.mark_text(align='center', baseline='bottom', dy=-5, fontSize=14, fontWeight='bold').encode(text='العدد:Q')
+                st.altair_chart((bars + text).properties(height=280), use_container_width=True)
 
     # --------------------------------------------------
-    # TAB 3: المراجعة (بدون خيار غائب في الأزرار والتشارت، وموجود في الجدول)
+    # TAB 3: المراجعة (مع استبدال السجل القديم بنظام INSERT OR REPLACE)
     # --------------------------------------------------
     with tab3:
         st.markdown("### 🔄 تسجيل المراجعة")
-        selected_student_rev = st.selectbox(
-            "🔍 اختر اسم الطالب أو اكتب للبحث:",
-            students_list,
-            index=None,
-            placeholder="اضغط لاختيار الطالب أو اكتب اسمه...",
-            key="rev_select_student"
-        )
+        selected_student_rev = st.selectbox("🔍 اختر اسم الطالب أو اكتب للبحث:", students_list, index=None, placeholder="اضغط لاختيار الطالب أو اكتب اسمه...", key="rev_select_student")
         
         if selected_student_rev:
             st.success(f"تم اختيار الطالب: *{selected_student_rev}*")
@@ -559,7 +458,6 @@ else:
                 st.session_state["show_hizb_grid"] = False
 
             st.write("📖 *حزب المراجعة:*")
-            
             current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب (من الأعلى إلى الفاتحة) 🔻"
             if st.button(f"🟢 {current_hizb_text}", use_container_width=True, key="toggle_hizb_btn"):
                 st.session_state["show_hizb_grid"] = not st.session_state["show_hizb_grid"]
@@ -577,80 +475,51 @@ else:
             
             if review_hizb:
                 st.success(f"تم تحديد الحزب: *{review_hizb}*")
-                
-                # إزالة "غائب" من خيارات التقييم اليدوي للمراجعة
                 review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
                 
                 if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
+                    # استخدام INSERT OR REPLACE لتحديث التقييم القديم لنفس اليوم تلقائياً
                     cursor.execute("""
-                        INSERT INTO review_records (date, student_name, amount, rating)
+                        INSERT OR REPLACE INTO review_records (date, student_name, amount, rating)
                         VALUES (?, ?, ?, ?)
                     """, (str(entry_date), selected_student_rev, review_hizb, review_rating))
                     conn.commit()
-                    st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev}) بنجاح!")
-                    
+                    st.success(f"تم تحديث مراجعة الطالب ({selected_student_rev}) بنجاح!")
                     st.session_state["selected_hizb"] = None
                     st.rerun()
             else:
                 st.warning("⚠️ يرجى اختيار الحزب أولاً قبل حفظ المراجعة.")
 
             st.divider()
-
             st.markdown(f"#### 📊 سجل مراجعة الطالب (آخر 10 نتائج): *{selected_student_rev}*")
 
             df_student_rev = pd.read_sql_query(
-                "SELECT date AS التاريخ, amount AS حزب_المراجعة, rating AS التقييم FROM review_records WHERE student_name = ? ORDER BY date DESC, id DESC LIMIT 10",
+                "SELECT date AS التاريخ, amount AS حزب_المراجعة, rating AS التقييم FROM review_records WHERE student_name = ? ORDER BY date DESC LIMIT 10",
                 conn, params=(selected_student_rev,)
             )
 
             if not df_student_rev.empty:
-                # الجدول يظهر فيه حالة الغياب بشكل طبيعي
                 html_table = "<table class='custom-table'><thead><tr><th>التاريخ</th><th>حزب المراجعة</th><th>التقييم</th></tr></thead><tbody>"
                 for _, row in df_student_rev.iterrows():
-                    if row['التقييم'] == "جيد":
-                        badge = "badge-good"
-                    elif row['التقييم'] == "إعادة":
-                        badge = "badge-retry"
-                    else:
-                        badge = "badge-absent"
+                    badge = "badge-good" if row['التقييم'] == "جيد" else ("badge-retry" if row['التقييم'] == "إعادة" else "badge-absent")
                     html_table += f"<tr><td>{row['التاريخ']}</td><td>{row['حزب_المراجعة']}</td><td><span class='{badge}'>{row['التقييم']}</span></td></tr>"
                 html_table += "</tbody></table>"
-
                 st.markdown(html_table, unsafe_allow_html=True)
 
                 st.divider()
-
-                # استبعاد "غائب" من الرسم البياني (Chart) بحيث يعرض "جيد" و "إعادة" فقط
                 df_chart_rev = df_student_rev[df_student_rev['التقييم'] != 'غائب']
 
                 if not df_chart_rev.empty:
                     rating_counts = df_chart_rev['التقييم'].value_counts().reset_index()
                     rating_counts.columns = ['التقييم', 'العدد']
 
-                    bars = alt.Chart(rating_counts).mark_bar(
-                        cornerRadiusTopLeft=10,
-                        cornerRadiusTopRight=10,
-                        width=60
-                    ).encode(
+                    bars = alt.Chart(rating_counts).mark_bar(cornerRadiusTopLeft=10, cornerRadiusTopRight=10, width=60).encode(
                         x=alt.X('التقييم:N', title='نوع التقييم', axis=alt.Axis(labelAngle=0, labelFontSize=14, titleFontSize=14)),
                         y=alt.Y('العدد:Q', title='عدد المرات', axis=alt.Axis(labelFontSize=12, titleFontSize=14)),
                         color=alt.Color('التقييم:N', scale=alt.Scale(domain=['جيد', 'إعادة'], range=['#10b981', '#ef4444']), legend=None),
                         tooltip=['التقييم', 'العدد']
                     )
-
-                    text = bars.mark_text(
-                        align='center',
-                        baseline='bottom',
-                        dy=-5,
-                        fontSize=14,
-                        fontWeight='bold'
-                    ).encode(
-                        text='العدد:Q'
-                    )
-
-                    chart = (bars + text).properties(height=280)
-                    st.altair_chart(chart, use_container_width=True)
-                else:
-                    st.info("لا توجد تقييمات (جيد/إعادة) كافية لعرض الرسم البياني حالياً.")
+                    text = bars.mark_text(align='center', baseline='bottom', dy=-5, fontSize=14, fontWeight='bold').encode(text='العدد:Q')
+                    st.altair_chart((bars + text).properties(height=280), use_container_width=True)
             else:
                 st.info("لا توجد سجلات مراجعة سابقة لهذا الطالب حتى الآن.")
