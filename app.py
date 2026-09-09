@@ -67,7 +67,7 @@ conn.commit()
 
 st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
 
-# تنسيق الاتجاه RTL
+# تنسيق الاتجاه RTL وتعديل عرض جداول البيانات لتناسب الهواتف
 st.markdown("""
     <style>
     .stMainBlockContainer { direction: rtl !important; text-align: right !important; }
@@ -77,6 +77,12 @@ st.markdown("""
     }
     section[data-testid="stSidebar"] { direction: ltr !important; }
     section[data-testid="stSidebar"] * { direction: rtl !important; text-align: right !important; }
+    
+    /* تنسيق جدول البيانات ليظهر بشكل واضح ومناسب للشاشات الصغيرة */
+    [data-testid="stDataFrame"] {
+        direction: rtl !important;
+        width: 100% !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -364,8 +370,16 @@ else:
             )
 
             if not df_student_hifz.empty:
-                # عرض الجدول بدون الفهرس الجانبي لتوفير المساحة وإظهار التاريخ كاملاً
-                st.dataframe(df_student_hifz, use_container_width=True, hide_index=True)
+                # عرض الجدول باستخدام st.dataframe المنسق صراحة لتوزيع المساحة 50% لكل عمود
+                st.dataframe(
+                    df_student_hifz,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "التاريخ": st.column_config.TextColumn("التاريخ", width="medium"),
+                        "التقييم": st.column_config.TextColumn("التقييم", width="medium"),
+                    }
+                )
 
                 st.divider()
 
