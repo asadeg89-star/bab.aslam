@@ -312,7 +312,7 @@ else:
     entry_date = st.date_input("📅 تحديد تاريخ اليوم:", date.today())
     st.divider()
 
-    tab1, tab2, tab3 = st.tabs(["📝 الحضور والغياب الجماعي", "📖 الحفظ الجديد", "🔄 المراجعة"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📝 الحضور والغياب الجماعي", "📖 الحفظ الجديد", "🔄 المراجعة", "🎯 متابعة تسلسل الأحزاب (مراجعة الحلقة)"])
 
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
@@ -335,7 +335,6 @@ else:
                 cursor.execute("DELETE FROM attendance_records WHERE date = ? AND student_name = ?", (str(entry_date), student_name))
                 cursor.execute("INSERT INTO attendance_records (date, student_name, status) VALUES (?, ?, ?)", (str(entry_date), student_name, status))
                 
-                # إذا كان الطالب غائباً يتم تثبيت الحفظ والمراجعة كـ "غائب" تلقائياً
                 if status in ["غياب", "غياب بعذر"]:
                     cursor.execute("DELETE FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), student_name))
                     cursor.execute("INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating) VALUES (?, ?, ?, ?, ?, ?)", (str(entry_date), student_name, "-", 0, 0, "غائب"))
@@ -444,3 +443,51 @@ else:
                     html_table += f"<tr><td>{row['التاريخ']}</td><td>{row['حزب_المراجعة']}</td><td><span class='{badge}'>{row['التقييم']}</span></td></tr>"
                 html_table += "</tbody></table>"
                 st.markdown(html_table, unsafe_allow_html=True)
+
+    with tab4:
+        st.markdown("### 🎯 متابعة تسلسل الأحزاب (مراجعة الحلقة)")
+        st.info("💡 *آلية النظام:* يبحث هذا الخيار في سجلات المراجعة السابقة. إذا اجتاز الطالب حزباً بتقدير **(جيد)**، فإن النظام يقترح ويحدد تلقائياً الحزب التالي في الترتيب ليقوم بمراجعته اليوم.")
+        
+        # اختيار الحزب المراد البحث عنه لمراجعة الحلقة
+        search_target_hizb = st.selectbox("🔎 اختر الحزب المطلوب لمعرفة الطلاب المطالبين بمراجعته اليوم:", AHZAB_LIST, index=0, key="circle_review_search")
+        
+        if search_target_hizb:
+            # معرفة موقع الحزب المختار في القائمة
+            target_index = AHZAB_LIST.index(search_target_hizb)
+            # الحزب السابق في القائمة (الذي إن سمعه الطالب بتقدير جيد، ينتقل للحزب المختار اليوم)
+            if target_index > 0:
+                previous_hizb = AHZAB_LIST[target_index - 1]
+                st.markdown(f"📌 *التحليل:* الطلاب الذين ميزوا في حزب (*{previous_hizb}*) بتقدير *(جيد)* في آخر تسميع لهم، دورهم اليوم في مراجعة حزب (*{search_target_hizb}*).")
+                
+                # استعلام لجلب آخر جلسة لكل طالب حقق "جيد" في الحزب السابق
+                query_expected = f"""
+                SELECT r.student_name AS الطالب, r.date AS تاريخ_آخر_إنجاز, r.amount AS الحزب_السابق 
+                FROM review_records r
+                JOIN (
+                    SELECT student_name, MAX(id) as max_id 
+                    FROM review_records 
+                    WHERE amount = ? AND rating = 'جيد' 
+                    GROUP BY student_name
+                ) latest ON r.id = latest.max_id
+                """
+                df_expected = pd.read_sql_query(query_expected, conn, params=(previous_hizb,))
+                
+                if not df_expected.empty:
+                    st.success(f"الطلاب المفترض مراجعتهم لـ ({search_target_hizb}) اليوم بناءً على تتبع التسلسل:")
+                    html_exp_table = "<table class='custom-table'><thead><tr><th>اسم الطالب</th><th>آخر تاريخ إنجاز</th><th>الحزب السابق المجتاز</th><th>الحزب الحالي المطلوب</th></tr></thead><tbody>"
+                    for _, row in df_expected.iterrows():
+                        html_exp_table += f"<tr><td><b>{row['الطالب']}</b></td><td>{row['تاريخ_آخر_إنجاز']}</td><td>{row['الحزب_السابق']}</td><td><span class='badge-good'>{search_target_hizb}</span></td></tr>"
+                    html_exp_table += "</tbody></table>"
+                    st.markdown(html_exp_table, unsafe_allow_html=True)
+                else:
+                    st.warning(f"لايوجد طلاب مسجلين اجتازوا حزب ({previous_hizb}) بتقدير 'جيد' حتى الآن.")
+            else:
+                st.info("هذا هو الحزب الأول في الترتيب (الأعلى).")
+
+            st.divider()
+            st.markdown(f"#### 📋 السجل الفعلي لمن راجعوا حزب ({search_target_hizb}) بالفعل:")
+            df_actual_rev = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM review_records WHERE amount = ? ORDER BY date DESC", conn, params=(search_target_hizb,))
+            if not df_actual_rev.empty:
+                st.dataframe(df_actual_rev, use_container_width=True, hide_index=True)
+            else:
+                st.info(f"لم يتم تسجيل أي مراجعة فعلية لحزب ({search_target_hizb}) حتى الآن.")
