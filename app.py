@@ -288,12 +288,21 @@ students_list = [row[0] for row in cursor.fetchall()]
 if st.session_state["role"] == "admin":
     st.sidebar.subheader("🗑️ إزالة طالب")
     if students_list:
-        student_to_remove = st.sidebar.selectbox("اختر الطالب للحذف:", students_list, key="rem_student_sb")
-        if st.sidebar.button("تأكيد حذف الطالب", type="secondary"):
-            cursor.execute("DELETE FROM students WHERE name = ?", (student_to_remove,))
-            conn.commit()
-            st.sidebar.success(f"تمت إزالة الطالب ({student_to_remove}) بنجاح!")
-            st.rerun()
+        student_to_remove = st.sidebar.selectbox(
+            "اختر الطالب المراد إزالته:",
+            students_list,
+            index=None,
+            placeholder="اختر الطالب للحذف...",
+            key="remove_select"
+        )
+        if st.sidebar.button("حذف الطالب", type="secondary"):
+            if student_to_remove:
+                cursor.execute("DELETE FROM students WHERE name = ?", (student_to_remove,))
+                conn.commit()
+                st.sidebar.success(f"تمت إزالة الطالب ({student_to_remove}) بنجاح!")
+                st.rerun()
+            else:
+                st.sidebar.warning("يرجى اختيار طالب أولاً لإزالته.")
 
 # --------------------------------------------------
 # الواجهة الرئيسية لتسجيل البيانات
@@ -351,7 +360,13 @@ else:
         )
 
         if export_option == "تقرير شخصي كامل لطالب محدد":
-            single_student = st.selectbox("اختر الطالب:", students_list, key="export_single_student")
+            single_student = st.selectbox(
+                "🔎 اختر اسم الطالب لتنزيل ملفه الخاص:",
+                students_list,
+                index=None,
+                placeholder="اضغط واكتب اسم الطالب...",
+                key="export_single_search"
+            )
             
             if single_student:
                 df_att_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
@@ -426,9 +441,17 @@ else:
     with tab2:
         st.markdown("### 📖 تسجيل الحفظ الجديد")
         
-        selected_student_hifz = st.selectbox("👤 اختر الطالب للتسميع:", students_list, key="hifz_student_sb")
+        selected_student_hifz = st.selectbox(
+            "🔍 اختر اسم الطالب أو اكتب للبحث:",
+            students_list,
+            index=None,
+            placeholder="اضغط لاختيار الطالب أو اكتب اسمه...",
+            key="hifz_select_student"
+        )
         
         if selected_student_hifz:
+            st.success(f"تم اختيار الطالب: *{selected_student_hifz}*")
+            
             hifz_rating = st.radio("تقييم الحفظ اليوم:", ["جيد", "إعادة"], horizontal=True, key="hifz_rate")
             
             if st.button("حفظ التسميع 💾", key="save_hifz", type="primary"):
@@ -491,25 +514,66 @@ else:
                 st.info("لا توجد سجلات حفظ سابقة لهذا الطالب حتى الآن.")
 
     # --------------------------------------------------
-    # TAB 3: المراجعة
+    # TAB 3: المراجعة (تنازلياً من الحزب 60 إلى 1 بدون كيبورد)
     # --------------------------------------------------
     with tab3:
         st.markdown("### 🔄 تسجيل المراجعة")
-        
-        selected_student_rev = st.selectbox("👤 اختر الطالب للمراجعة:", students_list, key="rev_student_sb")
+        selected_student_rev = st.selectbox(
+            "🔍 اختر اسم الطالب أو اكتب للبحث:",
+            students_list,
+            index=None,
+            placeholder="اضغط لاختيار الطالب أو اكتب اسمه...",
+            key="rev_select_student"
+        )
         
         if selected_student_rev:
-            review_hizb = st.selectbox("📖 حزب المراجعة:", AHZAB_LIST, key="rev_hizb_sb")
-            review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
+            st.success(f"تم اختيار الطالب: *{selected_student_rev}*")
+
+            # تهيئة متغير الحزب المختار في الجلسة
+            if "selected_hizb" not in st.session_state:
+                st.session_state["selected_hizb"] = None
+            if "show_hizb_grid" not in st.session_state:
+                st.session_state["show_hizb_grid"] = False
+
+            st.write("📖 *حزب المراجعة:*")
             
-            if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
-                cursor.execute("""
-                    INSERT INTO review_records (date, student_name, amount, rating)
-                    VALUES (?, ?, ?, ?)
-                """, (str(entry_date), selected_student_rev, review_hizb, review_rating))
-                conn.commit()
-                st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev}) بنجاح!")
+            # زر إظهار شبكة الأحزاب بالترتيب التنازلي من الفهرس
+            current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب (من 60 إلى 1) 🔻"
+            if st.button(f"🟢 {current_hizb_text}", use_container_width=True, key="toggle_hizb_btn"):
+                st.session_state["show_hizb_grid"] = not st.session_state["show_hizb_grid"]
                 st.rerun()
+
+            # عرض قائمة الأحزاب على شكل أزرار شبكية بالترتيب التنازلي المطلوب
+            if st.session_state["show_hizb_grid"]:
+                st.info("اضغط على اسم الحزب لاختياره مباشرة (تنازلياً من الحزب 60 إلى 1):")
+                cols = st.columns(2) # عرض الأحزاب في عمودين لتكون واضحة
+                for idx, hizb in enumerate(AHZAB_LIST):
+                    col = cols[idx % 2]
+                    if col.button(hizb, key=f"hizb_btn_{idx}", use_container_width=True):
+                        st.session_state["selected_hizb"] = hizb
+                        st.session_state["show_hizb_grid"] = False # إغلاق القائمة فوراً
+                        st.rerun()
+
+            review_hizb = st.session_state["selected_hizb"]
+            
+            if review_hizb:
+                st.success(f"تم تحديد الحزب: *{review_hizb}*")
+                
+                review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
+                
+                if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
+                    cursor.execute("""
+                        INSERT INTO review_records (date, student_name, amount, rating)
+                        VALUES (?, ?, ?, ?)
+                    """, (str(entry_date), selected_student_rev, review_hizb, review_rating))
+                    conn.commit()
+                    st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev}) بنجاح!")
+                    
+                    # إعادة ضبط اختيار الحزب للمرة القادمة
+                    st.session_state["selected_hizb"] = None
+                    st.rerun()
+            else:
+                st.warning("⚠️ يرجى اختيار الحزب أولاً قبل حفظ المراجعة.")
 
             st.divider()
 
