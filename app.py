@@ -283,7 +283,7 @@ else:
             df_att_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records", conn)
             df_pivot = df_att_raw.pivot_table(index='التاريخ', columns='الطالب', values='الحالة', aggfunc='first').reset_index() if not df_att_raw.empty else pd.DataFrame(columns=["التاريخ"])
             
-            st.dataframe(df_pivot, use_container_width=True)
+            st.dataframe(df_pivot, use_container_width=True, hide_index=True)
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_pivot.to_excel(writer, index=False, sheet_name='كشف_الحضور')
@@ -299,7 +299,7 @@ else:
             df_hifz_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records", conn)
             df_pivot = df_hifz_raw.pivot_table(index='التاريخ', columns='الطالب', values='التقييم', aggfunc='first').reset_index() if not df_hifz_raw.empty else pd.DataFrame(columns=["التاريخ"])
             
-            st.dataframe(df_pivot, use_container_width=True)
+            st.dataframe(df_pivot, use_container_width=True, hide_index=True)
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_pivot.to_excel(writer, index=False, sheet_name='كشف_الحفظ')
@@ -315,7 +315,7 @@ else:
             df_rev_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, (amount || ' [' || rating || ']') AS المراجعة FROM review_records", conn)
             df_pivot = df_rev_raw.pivot_table(index='التاريخ', columns='الطالب', values='المراجعة', aggfunc='first').reset_index() if not df_rev_raw.empty else pd.DataFrame(columns=["التاريخ"])
             
-            st.dataframe(df_pivot, use_container_width=True)
+            st.dataframe(df_pivot, use_container_width=True, hide_index=True)
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 df_pivot.to_excel(writer, index=False, sheet_name='كشف_المراجعة')
@@ -357,19 +357,19 @@ else:
 
             st.markdown(f"#### 📊 سجل إنجاز الطالب: *{selected_student_hifz}*")
 
-            # جلب البيانات مرتبة من الأحدث إلى الأقدم حسب التاريخ
+            # جلب البيانات مرتبة من الأحدث إلى الأقدم بحسب التاريخ
             df_student_hifz = pd.read_sql_query(
                 "SELECT date AS التاريخ, rating AS التقييم FROM hifz_records WHERE student_name = ? ORDER BY date DESC, id DESC",
                 conn, params=(selected_student_hifz,)
             )
 
             if not df_student_hifz.empty:
-                # 1. عرض جدول البيانات أولاً (مرتب من الأحدث إلى الأقدم)
-                st.dataframe(df_student_hifz, use_container_width=True)
+                # عرض الجدول بدون الفهرس الجانبي لتوفير المساحة وإظهار التاريخ كاملاً
+                st.dataframe(df_student_hifz, use_container_width=True, hide_index=True)
 
                 st.divider()
 
-                # 2. عرض الرسم البياني (Chart) ثانياً
+                # الرسم البياني
                 rating_counts = df_student_hifz['التقييم'].value_counts().reset_index()
                 rating_counts.columns = ['التقييم', 'العدد']
 
