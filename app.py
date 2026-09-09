@@ -7,7 +7,7 @@ import altair as alt
 
 st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
 
-# 1. إعداد قائمة أسماء الأحزاب فقط (بدون كلمة الحزب ورقم الحزب)
+# 1. إعداد قائمة أسماء الأحزاب فقط (من الأعلى إلى الفاتحة)
 AHZAB_LIST = [
     "الأعلى",
     "النبأ",
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS review_records (
 """)
 conn.commit()
 
-# تنسيق الاتجاه RTL وتوضيح الأزرار للعمل بمرونة على الهاتف
+# تنسيق الاتجاه RTL وتصميم زر اختيار الحزب
 st.markdown("""
     <style>
     .stMainBlockContainer { direction: rtl !important; text-align: right !important; }
@@ -179,7 +179,7 @@ st.markdown("""
         font-weight: bold;
     }
     
-    /* تحسين زر اختيار الحزب للوضوح العالي على الجوال */
+    /* تحسين شكل زر اختيار الحزب للوضوح العالي */
     div[data-testid="stPopover"] > button {
         width: 100% !important;
         background-color: #f0fdf4 !important;
@@ -526,7 +526,7 @@ else:
                 st.info("لا توجد سجلات حفظ سابقة لهذا الطالب حتى الآن.")
 
     # --------------------------------------------------
-    # TAB 3: المراجعة (قائمة منسدلة واضحة بدون كيبورد)
+    # TAB 3: المراجعة (تختفي النافذة فور اختيار الحزب)
     # --------------------------------------------------
     with tab3:
         st.markdown("### 🔄 تسجيل المراجعة")
@@ -541,18 +541,26 @@ else:
         if selected_student_rev:
             st.success(f"تم اختيار الطالب: *{selected_student_rev}*")
 
+            # تهيئة المتغير الحافظ للحزب المختار
+            if "selected_hizb" not in st.session_state:
+                st.session_state["selected_hizb"] = AHZAB_LIST[0]
+
+            def on_hizb_change():
+                st.session_state["selected_hizb"] = st.session_state["temp_hizb_choice"]
+
             st.write("📖 *اختر حزب المراجعة:*")
             
-            # زر واضح وكبير يفتح القائمة بنقرة واحدة بدون كيبورد
-            with st.popover("🟢 اضغط هنا لتحديد الحزب", use_container_width=True):
-                review_hizb = st.radio(
-                    "اختر اسم الحزب من القائمة:",
+            # نافذة الاختيار تغلق تلقائياً فور النقر على أي حزب
+            with st.popover(f"🟢 الحزب المختار حالياً: {st.session_state['selected_hizb']} (اضغط للتغيير)", use_container_width=True):
+                st.radio(
+                    "اختر اسم الحزب:",
                     AHZAB_LIST,
-                    index=0,
-                    key="rev_hizb_radio"
+                    index=AHZAB_LIST.index(st.session_state["selected_hizb"]),
+                    key="temp_hizb_choice",
+                    on_change=on_hizb_change
                 )
             
-            st.info(f"الحزب المختار: *{review_hizb}*")
+            review_hizb = st.session_state["selected_hizb"]
             
             review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
             
