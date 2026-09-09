@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS review_records (
 """)
 conn.commit()
 
-# تنسيق الاتجاه RTL والجدول المخصص للهواتف وتعطيل الكيبورد في القوائم المحددة
+# تنسيق الاتجاه RTL والجدول المخصص للهواتف
 st.markdown("""
     <style>
     .stMainBlockContainer { direction: rtl !important; text-align: right !important; }
@@ -178,24 +178,7 @@ st.markdown("""
         border-radius: 6px;
         font-weight: bold;
     }
-
-    /* منع إظهار لوحة المفاتيح للهواتف في القائمة المنسدلة للاحزاب */
-    .no-keyboard input {
-        pointer-events: none !important;
-    }
     </style>
-
-    <script>
-    // حظر استدعاء لوحة المفاتيح باللمس لخانة الأحزاب
-    const observer = new MutationObserver(() => {
-        const inputs = document.querySelectorAll('.no-keyboard input');
-        inputs.forEach(input => {
-            input.setAttribute('readonly', 'readonly');
-            input.setAttribute('inputmode', 'none');
-        });
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    </script>
     """, unsafe_allow_html=True)
 
 # --------------------------------------------------
@@ -531,7 +514,7 @@ else:
                 st.info("لا توجد سجلات حفظ سابقة لهذا الطالب حتى الآن.")
 
     # --------------------------------------------------
-    # TAB 3: المراجعة
+    # TAB 3: المراجعة (تحديث يمنع ظهور لوحة المفاتيح)
     # --------------------------------------------------
     with tab3:
         st.markdown("### 🔄 تسجيل المراجعة")
@@ -546,15 +529,16 @@ else:
         if selected_student_rev:
             st.success(f"تم اختيار الطالب: *{selected_student_rev}*")
 
-            # حاوية تمنع الكيبورد بواسطة الكود المضاف اعلاه (no-keyboard)
-            st.markdown('<div class="no-keyboard">', unsafe_allow_html=True)
-            review_hizb = st.selectbox(
-                "📖 حزب المراجعة:",
-                AHZAB_LIST,
-                index=0,
-                key="rev_hizb_select"
-            )
-            st.markdown('</div>', unsafe_allow_html=True)
+            # نافذة منبثقة لاختيار الحزب دون استدعاء الكيبورد على الهاتف
+            with st.popover("📖 اضغط هنا لاختيار حزب المراجعة", use_container_width=True):
+                review_hizb = st.radio(
+                    "اختر الحزب من القائمة:",
+                    AHZAB_LIST,
+                    index=0,
+                    key="rev_hizb_radio"
+                )
+            
+            st.info(f"الحزب المختار: *{review_hizb}*")
             
             review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
             
@@ -569,7 +553,7 @@ else:
 
             st.divider()
 
-            # عرض الجدول والتشارت مثل قائمة الحفظ
+            # عرض سجل نتائج المراجعة
             st.markdown(f"#### 📊 سجل مراجعة الطالب (آخر 10 نتائج): *{selected_student_rev}*")
 
             df_student_rev = pd.read_sql_query(
