@@ -4,14 +4,8 @@ import io
 import pandas as pd
 import streamlit as st
 import altair as alt
-import extra_streamlit_components as stx
 
 st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
-
-# --------------------------------------------------
-# إدارة الكوكيز للحفاظ على تسجيل الدخول عند تحديث الصفحة
-# --------------------------------------------------
-cookie_manager = stx.CookieManager()
 
 # 1. إعداد قاعدة البيانات وتأسيس الجداول
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
@@ -124,22 +118,24 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --------------------------------------------------
-# نظام تسجيل الدخول مع حفظ الجلسة في الكوكيز
+# نظام الجلسات باستخدام الرابط (st.query_params)
 # --------------------------------------------------
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
     st.session_state["username"] = ""
     st.session_state["role"] = ""
 
-# استرجاع الجلسة من الكوكيز عند تحديث الصفحة
-cookie_user = cookie_manager.get(cookie="auth_user")
-cookie_role = cookie_manager.get(cookie="auth_role")
+# التثبت من الجلسة عبر رابط الصفحة
+if "user" in st.query_params:
+    logged_username = st.query_params["user"]
+    cursor.execute("SELECT role FROM users WHERE username = ?", (logged_username,))
+    user_data = cursor.fetchone()
+    if user_data:
+        st.session_state["authenticated"] = True
+        st.session_state["username"] = logged_username
+        st.session_state["role"] = user_data[0]
 
-if cookie_user and cookie_role and not st.session_state["authenticated"]:
-    st.session_state["authenticated"] = True
-    st.session_state["username"] = cookie_user
-    st.session_state["role"] = cookie_role
-
+# شاشة تسجيل الدخول
 if not st.session_state["authenticated"]:
     st.title("🔐 تسجيل الدخول للبرنامج")
     
@@ -157,9 +153,8 @@ if not st.session_state["authenticated"]:
                 st.session_state["username"] = username_input.strip()
                 st.session_state["role"] = user_match[0]
                 
-                # حفظ بيانات الجلسة في الكوكيز لمدة 7 أيام
-                cookie_manager.set("auth_user", username_input.strip(), key="set_user", expires_at=date.fromordinal(date.today().toordinal() + 7))
-                cookie_manager.set("auth_role", user_match[0], key="set_role", expires_at=date.fromordinal(date.today().toordinal() + 7))
+                # حفظ المستخدم في الرابط لإبقاء الجلسة عند تحديث الصفحة
+                st.query_params["user"] = username_input.strip()
                 
                 st.success("تم تسجيل الدخول بنجاح!")
                 st.rerun()
@@ -178,9 +173,8 @@ if st.sidebar.button("🚪 تسجيل الخروج"):
     st.session_state["username"] = ""
     st.session_state["role"] = ""
     
-    # مسح الكوكيز عند تسجيل الخروج
-    cookie_manager.delete("auth_user")
-    cookie_manager.delete("auth_role")
+    # مسح المستخدم من الرابط عند تسجيل الخروج
+    st.query_params.clear()
     st.rerun()
 
 st.sidebar.divider()
