@@ -366,17 +366,34 @@ if st.session_state['role'] == 'admin':
                 else:
                     st.download_button("📥 تحميل الكشف كـ HTML/PDF", df_pivot.to_html(index=False), "كشف_المراجعة.html", "text/html", use_container_width=True)
 
-    with st.sidebar.expander("🗑️ مسح وإعادة تعيين بيانات التجربة"):
+    with st.sidebar.expander("🗑️ مسح وإعادة تعيين البيانات"):
+        st.markdown("##### 1️⃣ مسح السجلات والحركات فقط")
+        st.caption("يحذف كافة سجلات الحضور، والحفظ، والمراجعة مع الاحتفاظ بأسماء الطلاب.")
+        confirm_records_reset = st.checkbox("أوافق على مسح السجلات والحركات", key="confirm_records_reset_box")
+        if st.button("🗑️ مسح السجلات والحركات (الاحتفاظ بالأسماء)", type="secondary", use_container_width=True):
+            if confirm_records_reset:
+                cursor.execute("DELETE FROM attendance_records")
+                cursor.execute("DELETE FROM hifz_records")
+                cursor.execute("DELETE FROM review_records")
+                conn.commit()
+                st.success("✅ تم مسح جميع سجلات الحضور والحفظ والمراجعة بنجاح مع الاحتفاظ بأسماء الطلاب.")
+                st.rerun()
+            else:
+                st.error("يرجى تحديد مربع التأكيد أولاً.")
+
+        st.divider()
+
+        st.markdown("##### 2️⃣ مسح شامل (الأسماء والبيانات معاً)")
         st.warning("⚠️ سيؤدي هذا الخيار إلى حذف جميع الطلاب، وحركات الحضور، وسجلات الحفظ والمراجعة نهائياً للبدء بنظافة.")
-        confirm_reset = st.checkbox("أوافق على مسح كافة البيانات والتجارب", key="confirm_reset_box")
-        if st.button("🚨 مسح وإعادة تعيين البرنامج بالكامل", type="primary", use_container_width=True):
-            if confirm_reset:
+        confirm_full_reset = st.checkbox("أوافق على مسح كافة الطلاب والبيانات بالكامل", key="confirm_full_reset_box")
+        if st.button("🚨 مسح شامل (الأسماء والبيانات بالكامل)", type="primary", use_container_width=True):
+            if confirm_full_reset:
                 cursor.execute("DELETE FROM attendance_records")
                 cursor.execute("DELETE FROM hifz_records")
                 cursor.execute("DELETE FROM review_records")
                 cursor.execute("DELETE FROM students")
                 conn.commit()
-                st.success("✅ تم مسح كافة البيانات بنجاح وأصبح البرنامج نظيفاً وجاهزاً.")
+                st.success("✅ تم مسح كافة الطلاب والبيانات بنجاح وأصبح البرنامج نظيفاً وجاهزاً.")
                 st.rerun()
             else:
                 st.error("يرجى تحديد مربع التأكيد أولاً.")
