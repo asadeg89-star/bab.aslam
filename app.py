@@ -7,68 +7,68 @@ import altair as alt
 
 st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
 
-# 1. إعداد قائمة أسماء الأحزاب بالترتيب المصحف الصحيح (غير الأبجدي)
+# 1. إعداد قائمة أسماء الأحزاب تنازلياً من الحزب 60 (الأعلى) إلى الحزب 1 (الفاتحة) بناءً على الفهرس
 AHZAB_LIST = [
-    "الأعلى",
-    "النبأ",
-    "الجن",
-    "الملك",
-    "الجمعة",
-    "المجادلة",
-    "الرحمن",
-    "قال فما خطبكم",
-    "لقد رضي",
-    "الأحقاف",
-    "قل أولو جئتكم",
-    "إليه يرد",
-    "وبقوم مالي",
-    "فمن أظلم",
-    "فنبذناه",
-    "وما أنزلنا",
-    "قل من يرزقكم",
-    "إن المسلمين",
-    "ومن يسلم",
-    "ولا تجادلوا",
-    "ولقد وصلنا",
-    "قل الحمد لله",
-    "قالوا أأنؤمن",
-    "وقال الذين لا يرجون",
-    "يأيها الذين آمنوا",
-    "المؤمنون",
-    "الحج",
-    "الأنبيائ",
-    "طه",
-    "قال ألم أقل لك",
-    "أولم يَرَوْا",
-    "سبحان الذي",
-    "وقال الله",
-    "الحجر",
-    "أمن يعلم",
-    "وما أبرئ",
-    "وإلى مدين",
-    "وما من دابة",
-    "الذين أحسنوا",
-    "إنما السبيل",
-    "يأيها الذين آمنوا",
-    "واعلموا",
-    "وإذ نتقنا",
-    "قال الملأ",
-    "الأعراف",
-    "ولو أننا نزلنا",
-    "إنما يستجيب",
-    "لتجدن",
-    "قال رجلان",
-    "لا يحب",
-    "الله لا إله إلا هو",
-    "المحصنات",
-    "يستبشرون",
-    "لن تنالوا",
-    "قل أؤنبئكم",
-    "تلك الرسل",
-    "واذكروا الله",
-    "سيقول",
-    "وإذا لقوا",
-    "الفاتحة"
+    "الستون: الأعلى",
+    "التاسع والخمسون: النبأ",
+    "الثامن والخمسون: الجن",
+    "السابع والخمسون: الملك",
+    "السادس والخمسون: الجمعة",
+    "الخامس والخمسون: المجادلة",
+    "الرابع والخمسون: الرحمن",
+    "الثالث والخمسون: قال فما خطبكم",
+    "الثاني والخمسون: لقد رضي",
+    "الحادي والخمسون: الأحقاف",
+    "الخمسون: قل أولو جئتكم",
+    "التاسع والأربعون: إليه يرد",
+    "الثامن والأربعون: وبقوم مالي",
+    "السابع والأربعون: فمن أظلم",
+    "السادس والأربعون: فنبذناه",
+    "الخامس والأربعون: وما أنزلنا",
+    "الرابع والأربعون: قل من يرزقكم",
+    "الثالث والأربعون: إن المسلمين",
+    "الثاني والأربعون: ومن يسلم",
+    "الحادي والأربعون: ولا تجادلوا",
+    "الأربعون: ولقد وصلنا",
+    "التاسع والثلاثون: قل الحمد لله",
+    "الثامن والثلاثون: قالوا أأنؤمن",
+    "السابع والثلاثون: وقال الذين لا يرجون",
+    "السادس والثلاثون: يأيها الذين آمنوا",
+    "الخامس والثلاثون: المؤمنون",
+    "الرابع والثلاثون: الحج",
+    "الثالث والثلاثون: الأنبياء",
+    "الثاني والثلاثون: طه",
+    "الحادي والثلاثون: قال ألم أقل لك",
+    "الثلاثون: أولم يَرَوْا",
+    "التاسع والعشرون: سبحان الذي",
+    "الثامن والعشرون: وقال الله",
+    "السابع والعشرون: الحجر",
+    "السادس والعشرون: أمن يعلم",
+    "الخامس والعشرون: وما أبرئ",
+    "الرابع والعشرون: وإلى مدين",
+    "الثالث والعشرون: وما من دابة",
+    "الثاني والعشرون: الذين أحسنوا",
+    "الحادي والعشرون: إنما السبيل",
+    "العشرون: يأيها الذين آمنوا",
+    "التاسع عشر: واعلموا",
+    "الثامن عشر: وإذ نتقنا",
+    "السابع عشر: قال الملأ",
+    "السادس عشر: الأعراف",
+    "الخامس عشر: ولو أننا نزلنا",
+    "الرابع عشر: إنما يستجيب",
+    "الثالث عشر: لتجدن",
+    "الثاني عشر: قال رجلان",
+    "الحادي عشر: لا يحب",
+    "العاشر: الله لا إله إلا هو",
+    "التاسع: المحصنات",
+    "الثامن: يستبشرون",
+    "السابع: لن تنالوا",
+    "السادس: قل أؤنبئكم",
+    "الخامس: تلك الرسل",
+    "الرابع: واذكروا الله",
+    "الثالث: سيقول",
+    "الثاني: وإذا لقوا",
+    "الأول: الفاتحة"
 ]
 
 # 2. إعداد قاعدة البيانات وتأسيس الجداول
@@ -288,21 +288,33 @@ students_list = [row[0] for row in cursor.fetchall()]
 if st.session_state["role"] == "admin":
     st.sidebar.subheader("🗑️ إزالة طالب")
     if students_list:
-        student_to_remove = st.sidebar.selectbox(
-            "اختر الطالب المراد إزالته:",
-            students_list,
-            index=None,
-            placeholder="اختر الطالب للحذف...",
-            key="remove_select"
-        )
-        if st.sidebar.button("حذف الطالب", type="secondary"):
-            if student_to_remove:
+        # تهيئة متغير اختيار الطالب للحذف بشبكة أزرار لمنع الكيبورد
+        if "remove_student_selected" not in st.session_state:
+            st.session_state["remove_student_selected"] = None
+        if "show_remove_grid" not in st.session_state:
+            st.session_state["show_remove_grid"] = False
+
+        rem_btn_text = st.session_state["remove_student_selected"] if st.session_state["remove_student_selected"] else "اختر الطالب للحذف 🔻"
+        if st.sidebar.button(f"🗑️ {rem_btn_text}", key="toggle_remove_grid", use_container_width=True):
+            st.session_state["show_remove_grid"] = not st.session_state["show_remove_grid"]
+            st.rerun()
+
+        if st.session_state["show_remove_grid"]:
+            st.sidebar.info("اختر الطالب للحذف:")
+            for s_name in students_list:
+                if st.sidebar.button(s_name, key=f"rem_s_{s_name}", use_container_width=True):
+                    st.session_state["remove_student_selected"] = s_name
+                    st.session_state["show_remove_grid"] = False
+                    st.rerun()
+
+        student_to_remove = st.session_state["remove_student_selected"]
+        if student_to_remove:
+            if st.sidebar.button("تأكيد حذف الطالب", type="secondary"):
                 cursor.execute("DELETE FROM students WHERE name = ?", (student_to_remove,))
                 conn.commit()
                 st.sidebar.success(f"تمت إزالة الطالب ({student_to_remove}) بنجاح!")
+                st.session_state["remove_student_selected"] = None
                 st.rerun()
-            else:
-                st.sidebar.warning("يرجى اختيار طالب أولاً لإزالته.")
 
 # --------------------------------------------------
 # الواجهة الرئيسية لتسجيل البيانات
@@ -360,15 +372,30 @@ else:
         )
 
         if export_option == "تقرير شخصي كامل لطالب محدد":
-            single_student = st.selectbox(
-                "🔎 اختر اسم الطالب لتنزيل ملفه الخاص:",
-                students_list,
-                index=None,
-                placeholder="اضغط واكتب اسم الطالب...",
-                key="export_single_search"
-            )
+            if "export_student_selected" not in st.session_state:
+                st.session_state["export_student_selected"] = None
+            if "show_export_grid" not in st.session_state:
+                st.session_state["show_export_grid"] = False
+
+            exp_btn_text = st.session_state["export_student_selected"] if st.session_state["export_student_selected"] else "🔎 اضغط لاختيار الطالب للتنزيل 🔻"
+            if st.button(f"📂 {exp_btn_text}", key="toggle_export_grid", use_container_width=True):
+                st.session_state["show_export_grid"] = not st.session_state["show_export_grid"]
+                st.rerun()
+
+            if st.session_state["show_export_grid"]:
+                st.info("اختر الطالب المطلوب:")
+                cols_exp = st.columns(2)
+                for idx, s_name in enumerate(students_list):
+                    c_exp = cols_exp[idx % 2]
+                    if c_exp.button(s_name, key=f"exp_s_{s_name}", use_container_width=True):
+                        st.session_state["export_student_selected"] = s_name
+                        st.session_state["show_export_grid"] = False
+                        st.rerun()
+
+            single_student = st.session_state["export_student_selected"]
             
             if single_student:
+                st.success(f"تم اختيار الطالب: *{single_student}*")
                 df_att_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
                 df_hifz_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
                 df_rev_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, amount AS حزب_المراجعة, rating AS التقييم FROM review_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
@@ -441,13 +468,28 @@ else:
     with tab2:
         st.markdown("### 📖 تسجيل الحفظ الجديد")
         
-        selected_student_hifz = st.selectbox(
-            "🔍 اختر اسم الطالب أو اكتب للبحث:",
-            students_list,
-            index=None,
-            placeholder="اضغط لاختيار الطالب أو اكتب اسمه...",
-            key="hifz_select_student"
-        )
+        if "hifz_student_selected" not in st.session_state:
+            st.session_state["hifz_student_selected"] = None
+        if "show_hifz_student_grid" not in st.session_state:
+            st.session_state["show_hifz_student_grid"] = False
+
+        hifz_s_text = st.session_state["hifz_student_selected"] if st.session_state["hifz_student_selected"] else "👤 اضغط لاختيار الطالب للتسميع 🔻"
+        if st.button(f"🔍 {hifz_s_text}", key="toggle_hifz_student_grid", use_container_width=True):
+            st.session_state["show_hizb_grid"] = False # إغلاق أي قوائم أخرى
+            st.session_state["show_hifz_student_grid"] = not st.session_state["show_hifz_student_grid"]
+            st.rerun()
+
+        if st.session_state["show_hifz_student_grid"]:
+            st.info("اختر الطالب:")
+            cols_hifz_s = st.columns(2)
+            for idx, s_name in enumerate(students_list):
+                c_h_s = cols_hifz_s[idx % 2]
+                if c_h_s.button(s_name, key=f"hifz_s_btn_{s_name}", use_container_width=True):
+                    st.session_state["hifz_student_selected"] = s_name
+                    st.session_state["show_hifz_student_grid"] = False
+                    st.rerun()
+
+        selected_student_hifz = st.session_state["hifz_student_selected"]
         
         if selected_student_hifz:
             st.success(f"تم اختيار الطالب: *{selected_student_hifz}*")
@@ -461,6 +503,7 @@ else:
                 """, (str(entry_date), selected_student_hifz, "-", 0, 0, hifz_rating))
                 conn.commit()
                 st.success(f"تم حفظ تسميع الطالب ({selected_student_hifz})!")
+                st.session_state["hifz_student_selected"] = None
                 st.rerun()
 
             st.divider()
@@ -514,17 +557,33 @@ else:
                 st.info("لا توجد سجلات حفظ سابقة لهذا الطالب حتى الآن.")
 
     # --------------------------------------------------
-    # TAB 3: المراجعة (بدون كيبورد وترتيب مصحفي ثابت غير أبجدي)
+    # TAB 3: المراجعة (بدون كيبورد وبأزرار شبكية للطلاب والأحزاب)
     # --------------------------------------------------
     with tab3:
         st.markdown("### 🔄 تسجيل المراجعة")
-        selected_student_rev = st.selectbox(
-            "🔍 اختر اسم الطالب أو اكتب للبحث:",
-            students_list,
-            index=None,
-            placeholder="اضغط لاختيار الطالب أو اكتب اسمه...",
-            key="rev_select_student"
-        )
+        
+        if "rev_student_selected" not in st.session_state:
+            st.session_state["rev_student_selected"] = None
+        if "show_rev_student_grid" not in st.session_state:
+            st.session_state["show_rev_student_grid"] = False
+
+        rev_s_text = st.session_state["rev_student_selected"] if st.session_state["rev_student_selected"] else "👤 اضغط لاختيار الطالب للمراجعة 🔻"
+        if st.button(f"🔍 {rev_s_text}", key="toggle_rev_student_grid", use_container_width=True):
+            st.session_state["show_hizb_grid"] = False
+            st.session_state["show_rev_student_grid"] = not st.session_state["show_rev_student_grid"]
+            st.rerun()
+
+        if st.session_state["show_rev_student_grid"]:
+            st.info("اختر الطالب:")
+            cols_rev_s = st.columns(2)
+            for idx, s_name in enumerate(students_list):
+                c_r_s = cols_rev_s[idx % 2]
+                if c_r_s.button(s_name, key=f"rev_s_btn_{s_name}", use_container_width=True):
+                    st.session_state["rev_student_selected"] = s_name
+                    st.session_state["show_rev_student_grid"] = False
+                    st.rerun()
+
+        selected_student_rev = st.session_state["rev_student_selected"]
         
         if selected_student_rev:
             st.success(f"تم اختيار الطالب: *{selected_student_rev}*")
@@ -537,21 +596,19 @@ else:
 
             st.write("📖 *حزب المراجعة:*")
             
-            # زر إظهار شبكة الأحزاب بالترتيب القرآني
-            current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب 🔻"
+            current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب (من 60 إلى 1) 🔻"
             if st.button(f"🟢 {current_hizb_text}", use_container_width=True, key="toggle_hizb_btn"):
                 st.session_state["show_hizb_grid"] = not st.session_state["show_hizb_grid"]
                 st.rerun()
 
-            # عرض قائمة الأحزاب على شكل أزرار شبكية بالترتيب المصحفي الأصلي
             if st.session_state["show_hizb_grid"]:
-                st.info("اضغط على اسم الحزب لاختياره مباشرة (الترتيب حسب المصحف):")
-                cols = st.columns(3) # عرض الأحزاب في 3 أعمدة
+                st.info("اضغط على اسم الحزب لاختياره مباشرة (تنازلياً من الحزب 60 إلى 1):")
+                cols = st.columns(2)
                 for idx, hizb in enumerate(AHZAB_LIST):
-                    col = cols[idx % 3]
+                    col = cols[idx % 2]
                     if col.button(hizb, key=f"hizb_btn_{idx}", use_container_width=True):
                         st.session_state["selected_hizb"] = hizb
-                        st.session_state["show_hizb_grid"] = False # إغلاق القائمة فوراً
+                        st.session_state["show_hizb_grid"] = False
                         st.rerun()
 
             review_hizb = st.session_state["selected_hizb"]
@@ -569,8 +626,9 @@ else:
                     conn.commit()
                     st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev}) بنجاح!")
                     
-                    # إعادة ضبط اختيار الحزب للمرة القادمة
+                    # إعادة ضبط الاختيارات للمرة القادمة
                     st.session_state["selected_hizb"] = None
+                    st.session_state["rev_student_selected"] = None
                     st.rerun()
             else:
                 st.warning("⚠️ يرجى اختيار الحزب أولاً قبل حفظ المراجعة.")
