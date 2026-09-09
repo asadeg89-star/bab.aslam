@@ -451,10 +451,10 @@ else:
         entry_date = st.date_input("📅 تحديد التاريخ (خاص بمدير النظام):", date.today())
         
         st.markdown("---")
-        st.markdown("#### 🔒 إغلاق اليوم وتسكير السجلات")
+        st.markdown("#### 🔒 إغلاق اليوم")
         confirm_close_day = st.checkbox("أوافق على إغلاق اليوم وترصيد السجلات الفارغة لـ (لم يسمع)", key="confirm_close_day_box")
         
-        if st.button("🔒 تنفيذ إغلاق اليوم", help="يقوم هذا الزر بفحص جميع الطلاب الحاضرين في هذا اليوم ومن لم يتم تقييمه في الحفظ أو المراجعة يتم رصدها تلقائياً بكلمة لم يسمع", type="primary", use_container_width=True):
+        if st.button("🔒 إغلاق اليوم", help="يقوم هذا الزر بفحص جميع الطلاب الحاضرين في هذا اليوم ومن لم يتم تقييمه في الحفظ أو المراجعة يتم رصدها تلقائياً بكلمة لم يسمع", type="primary", use_container_width=True):
             if confirm_close_day:
                 cursor.execute("SELECT student_name FROM attendance_records WHERE date = ? AND status = 'حضور'", (str(entry_date),))
                 present_students = [row[0] for row in cursor.fetchall()]
@@ -477,7 +477,7 @@ else:
                 else:
                     st.info("جميع الطلاب الحاضرين مسجلة تقييماتهم مسبقاً ولا توجد حالات فارغة لتسويتها.")
             else:
-                st.error("⚠️ يرجى تحديد مربع التأكيد (أوافق على إغلاق اليوم) أولاً قبل الضغط على تنفيذ إغلاق اليوم.")
+                st.error("⚠️ يرجى تحديد مربع التأكيد (أوافق على إغلاق اليوم) أولاً قبل الضغط على زر إغلاق اليوم.")
     else:
         entry_date = date.today()
         st.caption(f"📅 تاريخ التسجيل اليوم: **{entry_date}**")
