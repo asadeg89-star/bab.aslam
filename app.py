@@ -1,11 +1,10 @@
 import sqlite3
 from datetime import date
-import io
 import pandas as pd
 import streamlit as st
 import altair as alt
 
-st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
+st.set_page_config(page_title="مركز تحفيظ باب السلام", page_icon="📖", layout="centered")
 
 AHZAB_LIST = [
     "الأعلى", "النبأ", "الجن", "الملك", "الجمعة", "المجادلة", "الرحمن", 
@@ -150,7 +149,7 @@ if st.sidebar.button("🚪 تسجيل الخروج"):
     st.rerun()
 
 st.sidebar.divider()
-st.title("📖 برنامج إدارة مركز التحفيظ")
+st.title("📖 مركز تحفيظ باب السلام")
 
 cursor.execute("SELECT name FROM students ORDER BY name ASC")
 students_list = [row[0] for row in cursor.fetchall()]
@@ -161,7 +160,7 @@ else:
     entry_date = st.date_input("📅 تحديد تاريخ اليوم:", date.today())
     st.divider()
 
-    tab1, tab2, tab3 = st.tabs(["📝 الحضور والغياب المجمع والتصدير", "📖 الحفظ الجديد", "🔄 المراجعة"])
+    tab1, tab2, tab3 = st.tabs(["📝 حضور وغياب", "📖 الحفظ الجديد", "🔄 المراجعة"])
 
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
@@ -184,7 +183,6 @@ else:
                 cursor.execute("DELETE FROM attendance_records WHERE date = ? AND student_name = ?", (str(entry_date), student_name))
                 cursor.execute("INSERT INTO attendance_records (date, student_name, status) VALUES (?, ?, ?)", (str(entry_date), student_name, status))
                 
-                # إذا كان الطالب غائباً يتم تثبيت الحفظ والمراجعة كـ "غائب" تلقائياً
                 if status in ["غياب", "غياب بعذر"]:
                     cursor.execute("DELETE FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), student_name))
                     cursor.execute("INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating) VALUES (?, ?, ?, ?, ?, ?)", (str(entry_date), student_name, "-", 0, 0, "غائب"))
@@ -195,52 +193,17 @@ else:
             conn.commit()
             st.success("✅ تم حفظ كشف الحضور وتحديث السجلات بنجاح!")
 
-        st.divider()
-        st.subheader("📊 تصدير السجلات إلى ملف Excel")
-        export_option = st.selectbox("اختر نوع الكشف المراد معاينته وتنزيله:", ["كشف الحضور والغياب الشبكي", "كشف الحفظ الشبكي", "كشف المراجعة الشبكي", "تقرير شخصي كامل لطالب محدد"])
-
-        if export_option == "تقرير شخصي كامل لطالب محدد":
-            single_student = st.selectbox("🔎 اختر اسم الطالب لتنزيل ملفه الخاص:", students_list, index=None, placeholder="اضغط واكتب اسم الطالب...", key="export_single_search")
-            if single_student:
-                df_att_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
-                df_hifz_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
-                df_rev_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, amount AS حزب_المراجعة, rating AS التقييم FROM review_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
-                
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    df_att_single.to_excel(writer, index=False, sheet_name='سجل_الحضور')
-                    df_hifz_single.to_excel(writer, index=False, sheet_name='سجل_الحفظ')
-                    df_rev_single.to_excel(writer, index=False, sheet_name='سجل_المراجعة')
-                st.download_button(label=f"📥 تنزيل ملف Excel الشامل لـ ({single_student})", data=output.getvalue(), file_name=f"تقرير_{single_student}_{date.today()}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-        elif export_option == "كشف الحضور والغياب الشبكي":
-            df_att_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records", conn)
-            df_pivot = df_att_raw.pivot_table(index='التاريخ', columns='الطالب', values='الحالة', aggfunc='first').reset_index() if not df_att_raw.empty else pd.DataFrame(columns=["التاريخ"])
-            st.dataframe(df_pivot, use_container_width=True, hide_index=True)
-
-        elif export_option == "كشف الحفظ الشبكي":
-            df_hifz_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records", conn)
-            df_pivot = df_hifz_raw.pivot_table(index='التاريخ', columns='الطالب', values='التقييم', aggfunc='first').reset_index() if not df_hifz_raw.empty else pd.DataFrame(columns=["التاريخ"])
-            st.dataframe(df_pivot, use_container_width=True, hide_index=True)
-
-        elif export_option == "كشف المراجعة الشبكي":
-            df_rev_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, (amount || ' [' || rating || ']') AS المراجعة FROM review_records", conn)
-            df_pivot = df_rev_raw.pivot_table(index='التاريخ', columns='الطالب', values='المراجعة', aggfunc='first').reset_index() if not df_rev_raw.empty else pd.DataFrame(columns=["التاريخ"])
-            st.dataframe(df_pivot, use_container_width=True, hide_index=True)
-
     with tab2:
         st.markdown("### 📖 تسجيل الحفظ الجديد")
         selected_student_hifz = st.selectbox("🔍 اختر اسم الطالب أو اكتب للبحث:", students_list, index=None, placeholder="اضغط لاختيار الطالب أو اكتب اسمه...", key="hifz_select_student")
         
         if selected_student_hifz:
-            # التحقق مما إذا كان الطالب مسجلاً كغائب في نفس اليوم
             cursor.execute("SELECT status FROM attendance_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_hifz))
             att_row = cursor.fetchone()
             is_absent = att_row and att_row[0] in ["غياب", "غياب بعذر"]
 
             if is_absent:
                 st.error(f"⚠️ تنبيه: الطالب (*{selected_student_hifz}*) مسجل كـ *({att_row[0]})* في هذا اليوم، لذلك لا يمكن تسجيل حفظ له وستبقى حالته غائباً.")
-                # فرض وتحديث الحفظ تلقائياً ليكون غائباً
                 cursor.execute("DELETE FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_hifz))
                 cursor.execute("INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating) VALUES (?, ?, ?, ?, ?, ?)", (str(entry_date), selected_student_hifz, "-", 0, 0, "غائب"))
                 conn.commit()
