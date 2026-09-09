@@ -499,7 +499,8 @@ else:
                 conn.commit()
             else:
                 st.success(f"تم اختيار الطالب: *{selected_student_hifz}*")
-                hifz_rating = st.radio("تقييم الحفظ اليوم:", ["جيد", "إعادة", "لم يسمع", "غائب"], horizontal=True, key="hifz_rate")
+                # تم تقييد الخيارات لتكون فقط (جيد) و (إعادة)
+                hifz_rating = st.radio("تقييم الحفظ اليوم:", ["جيد", "إعادة"], horizontal=True, key="hifz_rate")
                 
                 if st.button("حفظ التسميع 💾", key="save_hifz", type="primary", use_container_width=True):
                     cursor.execute("DELETE FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_hifz))
@@ -577,7 +578,8 @@ else:
                     review_hizb = st.session_state["selected_hizb"]
                     if review_hizb:
                         st.success(f"تم تحديد الحزب: *{review_hizb}*")
-                        review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة", "لم يسمع"], horizontal=True, key="rev_rate")
+                        # تم تقييد الخيارات لتكون فقط (جيد) و (إعادة)
+                        review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
                         
                         if st.button("حفظ المراجعة 💾", key="save_rev", type="primary", use_container_width=True):
                             cursor.execute("DELETE FROM review_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_rev))
