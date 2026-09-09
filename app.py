@@ -7,7 +7,7 @@ import altair as alt
 
 st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
 
-# القائمة بترتيب تصاعدي (من البداية إلى النهاية)
+# القائمة الأساسية مترتبة تصاعدياً (من الفاتحة إلى النهاية)
 AHZAB_LIST = [
     "الفاتحة", "وإذا لقوا", "سيقول", "واذكروا الله", "تلك الرسل", "قل أؤنبئكم", 
     "لن تنالوا", "يستبشرون", "المحصنات", "الله لا إله إلا هو", "لا يحب", 
@@ -21,6 +21,9 @@ AHZAB_LIST = [
     "وبقوم مالي", "إليه يرد", "قل أولو جئتكم", "الأحقاف", "لقد رضي", 
     "قال فما خطبكم", "الرحمن", "المجادلة", "الجمعة", "الملك", "الجن", "النبأ", "الأعلى"
 ]
+
+# نسخة معكوسة للقائمة المنسدلة لتظهر تنازلياً (من الحزب الستين إلى الحزب الأول)
+AHZAB_LIST_DESC = list(reversed(AHZAB_LIST))
 
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
 cursor = conn.cursor()
@@ -152,7 +155,6 @@ if st.sidebar.button("🚪 تسجيل الخروج"):
 
 st.sidebar.divider()
 
-# قسم إدارة الطلاب والاسترداد في القائمة الجانبية (خاص بمدير النظام فقط)
 if st.session_state['role'] == 'admin':
     st.sidebar.markdown("### ⚙️ لوحة تحكم المدير (الاسترداد والتصدير)")
     
@@ -405,14 +407,15 @@ else:
                     st.session_state["show_hizb_grid"] = False
 
                 st.write("📖 *حزب المراجعة:*")
-                current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب (ترتيب تصاعدي) 🔻"
+                current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب (من الأعلى للأسفل تنازلياً) 🔻"
                 if st.button(f"🟢 {current_hizb_text}", use_container_width=True, key="toggle_hizb_btn"):
                     st.session_state["show_hizb_grid"] = not st.session_state["show_hizb_grid"]
                     st.rerun()
 
                 if st.session_state["show_hizb_grid"]:
-                    st.info("اضغط على اسم الحزب لاختياره مباشرة:")
-                    for idx, hizb in enumerate(AHZAB_LIST):
+                    st.info("اضغط على اسم الحزب لاختياره مباشرة (الترتيب تنازلي من النهاية للبداية):")
+                    # عرض الشبكة بالترتيب التنازلي (من الحزب 60 وحتى الحزب 1)
+                    for idx, hizb in enumerate(AHZAB_LIST_DESC):
                         if st.button(hizb, key=f"hizb_btn_{idx}", use_container_width=True):
                             st.session_state["selected_hizb"] = hizb
                             st.session_state["show_hizb_grid"] = False
@@ -447,20 +450,17 @@ else:
 
     with tab4:
         st.markdown("### 🎯 متابعة تسلسل الأحزاب (مراجعة الحلقة)")
-        st.info("💡 *آلية النظام التصاعدية:* إذا اجتاز الطالب الحزب السابق بتقدير **(جيد)**، فإن النظام يحدد تلقائياً أن دوره اليوم هو مراجعة الحزب الذي يليه في الترتيب التصاعدي.")
+        st.info("💡 *آلية النظام التصاعدية:* إذا اجتاز الطالب الحزب السابق بتقدير **(جيد)**، فإن النظام يحدد تلقائياً أن دوره اليوم هو مراجعة الحزب الذي يليه في الترتيب.")
         
-        # اختيار الحزب المراد البحث عنه لمراجعة الحلقة
-        search_target_hizb = st.selectbox("🔎 اختر الحزب المطلوب لمعرفة الطلاب المطالبين بمراجعته اليوم:", AHZAB_LIST, index=0, key="circle_review_search")
+        # القائمة المنسدلة للبحث في متابعة الحلقة أصبحت تنازلياً أيضاً لتوحيد الواجهة
+        search_target_hizb = st.selectbox("🔎 اختر الحزب المطلوب لمعرفة الطلاب المطالبين بمراجعته اليوم (من الحزب الأخير إلى الأول):", AHZAB_LIST_DESC, index=0, key="circle_review_search")
         
         if search_target_hizb:
-            # معرفة موقع الحزب المختار في القائمة التصاعدية
             target_index = AHZAB_LIST.index(search_target_hizb)
-            # الحزب السابق في التسلسل التصاعدي (الذي إن سمعه الطالب بتقدير جيد، ينتقل للحزب المختار اليوم)
             if target_index > 0:
                 previous_hizb = AHZAB_LIST[target_index - 1]
-                st.markdown(f"📌 *التحليل التصاعدي:* الطلاب الذين أتقنوا حزب (*{previous_hizb}*) بتقدير *(جيد)* في آخر تسميع، دورهم المفترض اليوم في مراجعة حزب (*{search_target_hizb}*).")
+                st.markdown(f"📌 *التحليل:* الطلاب الذين أتقنوا حزب (*{previous_hizb}*) بتقدير *(جيد)* في آخر تسميع، دورهم المفترض اليوم في مراجعة حزب (*{search_target_hizb}*).")
                 
-                # استعلام لجلب آخر جلسة لكل طالب حقق "جيد" في الحزب السابق
                 query_expected = f"""
                 SELECT r.student_name AS الطالب, r.date AS تاريخ_آخر_إنجاز, r.amount AS الحزب_السابق 
                 FROM review_records r
@@ -474,7 +474,7 @@ else:
                 df_expected = pd.read_sql_query(query_expected, conn, params=(previous_hizb,))
                 
                 if not df_expected.empty:
-                    st.success(f"الطلاب المفترض مراجعتهم لـ ({search_target_hizb}) اليوم بناءً على التسلسل التصاعدي:")
+                    st.success(f"الطلاب المفترض مراجعتهم لـ ({search_target_hizb}) اليوم بناءً على التسلسل:")
                     html_exp_table = "<table class='custom-table'><thead><tr><th>اسم الطالب</th><th>آخر تاريخ إنجاز</th><th>الحزب السابق المجتاز</th><th>الحزب الحالي المطلوب</th></tr></thead><tbody>"
                     for _, row in df_expected.iterrows():
                         html_exp_table += f"<tr><td><b>{row['الطالب']}</b></td><td>{row['تاريخ_آخر_إنجاز']}</td><td>{row['الحزب_السابق']}</td><td><span class='badge-good'>{search_target_hizb}</span></td></tr>"
@@ -483,7 +483,7 @@ else:
                 else:
                     st.warning(f"لايوجد طلاب مسجلين اجتازوا حزب ({previous_hizb}) بتقدير 'جيد' حتى الآن.")
             else:
-                st.info("هذا هو الحزب الأول في الترتيب التصاعدي (الفاتحة).")
+                st.info("هذا هو الحزب الأول في الترتيب (الفاتحة).")
 
             st.divider()
             st.markdown(f"#### 📋 السجل الفعلي لمن راجعوا حزب ({search_target_hizb}) بالفعل:")
