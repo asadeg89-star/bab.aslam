@@ -99,7 +99,7 @@ st.markdown("""
         direction: rtl !important; 
         text-align: right !important; 
         background-color: #fcfdfd;
-        padding: 2rem;
+        padding: 1.5rem;
         border-radius: 16px;
     }
     .stMainBlockContainer div, .stMainBlockContainer p, .stMainBlockContainer label, 
@@ -118,27 +118,32 @@ st.markdown("""
         text-align: right !important; 
     }
     
-    /* تنسيق عنوان التطبيق ليكون متناسقاً ومرتباً */
+    /* تقليل المسافات والفراغات بين العناصر في كشف الحضور */
+    div.row-widget.stHorizontal {
+        gap: 5px !important;
+        align-items: center !important;
+    }
+    
     .app-header {
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 12px;
         background: #f8fafc;
-        padding: 15px;
+        padding: 12px;
         border-radius: 14px;
         border: 1px solid #e2e8f0;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
     }
     .app-header h1 {
         color: #0f766e;
         margin: 0;
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 700;
     }
     .app-header span {
-        font-size: 28px;
+        font-size: 24px;
     }
 
     /* تنسيق الجداول المخصصة */
@@ -154,7 +159,6 @@ st.markdown("""
     .badge-retry { background-color: #fee2e2; color: #991b1b; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 13px; display: inline-block; }
     .badge-absent { background-color: #f1f5f9; color: #475569; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 13px; display: inline-block; }
     
-    /* تخصيص الأزرار والعناصر الجمالية */
     div.stButton > button {
         border-radius: 10px;
         font-weight: 600;
@@ -381,7 +385,6 @@ if st.session_state['role'] == 'admin':
 
     st.sidebar.divider()
 
-# عرض الاسم بشكل مرتب ومنسق في سطر واحد مع الأيقونة
 st.markdown("""
     <div class="app-header">
         <span>📖</span>
@@ -408,13 +411,17 @@ else:
         attendance_results = {}
         status_options = ["حضور", "غياب", "غياب بعذر", "تأخير"]
 
+        # عرض مضغوط للأسماء في صفوف مرتبة لتقليل التباعد وعرض أكبر عدد من الطلاب
         for idx, student in enumerate(filtered_att_students):
-            st.write(f"*{idx + 1}. {student}*")
-            selected_status = st.radio(
-                f"حالة {student}:", options=status_options, index=0, key=f"att_{student}", horizontal=True, label_visibility="collapsed"
-            )
-            attendance_results[student] = selected_status
-            st.divider()
+            col_name, col_status = st.columns([1.2, 2.8])
+            with col_name:
+                st.markdown(f"<div style='padding-top: 6px; font-weight: 600; font-size: 15px;'>{idx + 1}. {student}</div>", unsafe_allow_html=True)
+            with col_status:
+                selected_status = st.radio(
+                    f"حالة {student}:", options=status_options, index=0, key=f"att_{student}", horizontal=True, label_visibility="collapsed"
+                )
+                attendance_results[student] = selected_status
+            st.markdown("<hr style='margin: 4px 0px; border-color: #f1f5f9;'>", unsafe_allow_html=True)
 
         if st.button("💾 حفظ كشف الحضور لجميع الطلاب الظاهرين", type="primary", use_container_width=True):
             for student_name, status in attendance_results.items():
