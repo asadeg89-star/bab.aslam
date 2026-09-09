@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
-st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
+st.set_page_config(page_title="إدارة حلقة القرآن الكريم", page_icon="📖", layout="centered")
 
 # القائمة الأساسية مترتبة تصاعدياً (من الفاتحة إلى النهاية)
 AHZAB_LIST = [
@@ -22,7 +22,6 @@ AHZAB_LIST = [
     "قال فما خطبكم", "الرحمن", "المجادلة", "الجمعة", "الملك", "الجن", "النبأ", "الأعلى"
 ]
 
-# نسخة معكوسة للقائمة المنسدلة لتظهر تنازلياً (من الحزب الستين إلى الحزب الأول)
 AHZAB_LIST_DESC = list(reversed(AHZAB_LIST))
 
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
@@ -87,25 +86,61 @@ cursor.execute("DELETE FROM hifz_records WHERE id NOT IN (SELECT MAX(id) FROM hi
 cursor.execute("DELETE FROM review_records WHERE id NOT IN (SELECT MAX(id) FROM review_records GROUP BY date, student_name)")
 conn.commit()
 
+# تصميم جمالي عصري (Modern UI & CSS)
 st.markdown("""
     <style>
-    .stMainBlockContainer { direction: rtl !important; text-align: right !important; }
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Cairo', sans-serif !important;
+    }
+    
+    .stMainBlockContainer { 
+        direction: rtl !important; 
+        text-align: right !important; 
+        background-color: #fcfdfd;
+        padding: 2rem;
+        border-radius: 16px;
+    }
     .stMainBlockContainer div, .stMainBlockContainer p, .stMainBlockContainer label, 
     .stMainBlockContainer h1, .stMainBlockContainer h2, .stMainBlockContainer h3 {
-        text-align: right !important; direction: rtl !important;
+        text-align: right !important; 
+        direction: rtl !important; 
     }
-    section[data-testid="stSidebar"] { direction: ltr !important; }
-    section[data-testid="stSidebar"] * { direction: rtl !important; text-align: right !important; }
     
-    .custom-table {
-        width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 15px; text-align: center; direction: rtl; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;
+    section[data-testid="stSidebar"] { 
+        direction: ltr !important; 
+        background-color: #f4f7f6;
+        border-left: 1px solid #e1e8e6;
     }
-    .custom-table th { background-color: #f8f9fa; color: #333; font-weight: bold; padding: 10px; border-bottom: 2px solid #dee2e6; }
-    .custom-table td { padding: 10px; border-bottom: 1px solid #e9ecef; }
-    .custom-table tr:nth-of-type(even) { background-color: #fdfdfd; }
-    .badge-good { background-color: #d1fae5; color: #065f46; padding: 4px 8px; border-radius: 6px; font-weight: bold; }
-    .badge-retry { background-color: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 6px; font-weight: bold; }
-    .badge-absent { background-color: #f3f4f6; color: #4b5563; padding: 4px 8px; border-radius: 6px; font-weight: bold; }
+    section[data-testid="stSidebar"] * { 
+        direction: rtl !important; 
+        text-align: right !important; 
+    }
+    
+    /* تنسيق الجداول المخصصة */
+    .custom-table {
+        width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 15px; text-align: center; direction: rtl; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+    .custom-table th { background-color: #0f766e; color: #ffffff; font-weight: 600; padding: 12px; border-bottom: 2px solid #0d9488; }
+    .custom-table td { padding: 12px; border-bottom: 1px solid #edf2f7; color: #1e293b; }
+    .custom-table tr:nth-of-type(even) { background-color: #f8fafc; }
+    
+    /* شارات التقييم الملونة */
+    .badge-good { background-color: #d1fae5; color: #065f46; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 13px; display: inline-block; }
+    .badge-retry { background-color: #fee2e2; color: #991b1b; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 13px; display: inline-block; }
+    .badge-absent { background-color: #f1f5f9; color: #475569; padding: 6px 12px; border-radius: 20px; font-weight: 700; font-size: 13px; display: inline-block; }
+    
+    /* تخصيص الأزرار والعناصر الجمالية */
+    div.stButton > button {
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(15, 118, 110, 0.15);
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -124,29 +159,31 @@ if "user" in st.query_params:
         st.session_state["role"] = user_data[0]
 
 if not st.session_state["authenticated"]:
-    st.title("🔐 تسجيل الدخول للبرنامج")
-    with st.form("login_form"):
-        username_input = st.text_input("اسم المستخدم:")
-        password_input = st.text_input("كلمة المرور:", type="password")
-        submit_login = st.form_submit_button("تسجيل الدخول", type="primary")
-        if submit_login:
-            cursor.execute("SELECT role FROM users WHERE username = ? AND password = ?", (username_input.strip(), password_input.strip()))
-            user_match = cursor.fetchone()
-            if user_match:
-                st.session_state["authenticated"] = True
-                st.session_state["username"] = username_input.strip()
-                st.session_state["role"] = user_match[0]
-                st.query_params["user"] = username_input.strip()
-                st.success("تم تسجيل الدخول بنجاح!")
-                st.rerun()
-            else:
-                st.error("اسم المستخدم أو كلمة المرور غير صحيحة.")
+    st.markdown("<h2 style='text-align: center; color: #0f766e;'>🔐 تسجيل الدخول لبرنامج إدارة مركز التحفيظ</h2>", unsafe_allow_html=True)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.form("login_form"):
+            username_input = st.text_input("اسم المستخدم:")
+            password_input = st.text_input("كلمة المرور:", type="password")
+            submit_login = st.form_submit_button("تسجيل الدخول", type="primary", use_container_width=True)
+            if submit_login:
+                cursor.execute("SELECT role FROM users WHERE username = ? AND password = ?", (username_input.strip(), password_input.strip()))
+                user_match = cursor.fetchone()
+                if user_match:
+                    st.session_state["authenticated"] = True
+                    st.session_state["username"] = username_input.strip()
+                    st.session_state["role"] = user_match[0]
+                    st.query_params["user"] = username_input.strip()
+                    st.success("تم تسجيل الدخول بنجاح!")
+                    st.rerun()
+                else:
+                    st.error("اسم المستخدم أو كلمة المرور غير صحيحة.")
     st.stop()
 
 st.sidebar.markdown(f"👤 مرحباً بك: *{st.session_state['username']}*")
 st.sidebar.caption(f"الرتبة: {'مدير النظام (رئيسي)' if st.session_state['role'] == 'admin' else 'معلم (مستخدم)'}")
 
-if st.sidebar.button("🚪 تسجيل الخروج"):
+if st.sidebar.button("🚪 تسجيل الخروج", use_container_width=True):
     st.session_state["authenticated"] = False
     st.session_state["username"] = ""
     st.session_state["role"] = ""
@@ -156,11 +193,11 @@ if st.sidebar.button("🚪 تسجيل الخروج"):
 st.sidebar.divider()
 
 if st.session_state['role'] == 'admin':
-    st.sidebar.markdown("### ⚙️ لوحة تحكم المدير (الاسترداد والتصدير)")
+    st.sidebar.markdown("### ⚙️ لوحة تحكم المدير")
     
     with st.sidebar.expander("👥 إدارة الطلاب (إضافة / حذف)"):
         new_student = st.text_input("اسم الطالب الجديد:")
-        if st.button("➕ إضافة الطالب"):
+        if st.button("➕ إضافة الطالب", use_container_width=True):
             if new_student.strip():
                 try:
                     cursor.execute("INSERT INTO students (name) VALUES (?)", (new_student.strip(),))
@@ -176,7 +213,7 @@ if st.session_state['role'] == 'admin':
         current_students_list = [row[0] for row in cursor.fetchall()]
         if current_students_list:
             del_student = st.selectbox("اختر الطالب للحذف:", current_students_list, index=None, placeholder="اختر طالباً...", key="del_stu_sidebar")
-            if st.button("🗑️ حذف الطالب المحدد", type="primary"):
+            if st.button("🗑️ حذف الطالب المحدد", type="primary", use_container_width=True):
                 if del_student:
                     cursor.execute("DELETE FROM students WHERE name = ?", (del_student,))
                     cursor.execute("DELETE FROM attendance_records WHERE student_name = ?", (del_student,))
@@ -186,11 +223,11 @@ if st.session_state['role'] == 'admin':
                     st.success(f"تم حذف الطالب ({del_student}) وجميع سجلاته بنجاح!")
                     st.rerun()
 
-    with st.sidebar.expander("📥 خيارات الاسترداد والتصدير الشاملة"):
+    with st.sidebar.expander("📥 خيارات الاسترداد والتصدير"):
         export_format_choice = st.radio("اختر صيغة التنزيل:", ["Excel (.xlsx)", "PDF (.html/print)"], horizontal=True, key="sidebar_export_fmt")
         
         export_option = st.selectbox(
-            "اختر الكشف أو التقرير المراد استرداده وتنزيله:", 
+            "اختر الكشف أو التقرير:", 
             [
                 "تنزيل قاعدة البيانات الشاملة (Backup)", 
                 "كشف الحضور والغياب الشبكي", 
@@ -205,7 +242,7 @@ if st.session_state['role'] == 'admin':
         all_students_sidebar = [row[0] for row in cursor.fetchall()]
 
         if export_option == "تقرير شخصي كامل لطالب محدد":
-            single_student_sb = st.selectbox("🔎 اختر اسم الطالب لتنزيل ملفه الخاص:", all_students_sidebar, index=None, placeholder="اكتب اسم الطالب...", key="sb_single_stu")
+            single_student_sb = st.selectbox("🔎 اختر اسم الطالب:", all_students_sidebar, index=None, placeholder="اكتب اسم الطالب...", key="sb_single_stu")
             if single_student_sb:
                 df_att_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student_sb}' ORDER BY date DESC", conn)
                 df_hifz_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student_sb}' ORDER BY date DESC", conn)
@@ -221,7 +258,8 @@ if st.session_state['role'] == 'admin':
                         label=f"📥 تنزيل Excel لـ ({single_student_sb})", 
                         data=output.getvalue(), 
                         file_name=f"تقرير_{single_student_sb}_{date.today()}.xlsx", 
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
                     )
                 else:
                     html_single = f"""
@@ -231,10 +269,10 @@ if st.session_state['role'] == 'admin':
                     <h3>الحفظ</h3>{df_hifz_single.to_html(index=False)}
                     <h3>المراجعة</h3>{df_rev_single.to_html(index=False)}</body></html>
                     """
-                    st.download_button(label=f"📥 تنزيل PDF/HTML لـ ({single_student_sb})", data=html_single, file_name=f"تقرير_{single_student_sb}.html", mime="text/html")
+                    st.download_button(label=f"📥 تنزيل PDF/HTML لـ ({single_student_sb})", data=html_single, file_name=f"تقرير_{single_student_sb}.html", mime="text/html", use_container_width=True)
 
         elif export_option == "تنزيل قاعدة البيانات الشاملة (Backup)":
-            if st.button("تنزيل النسخة الاحتياطية الكاملة"):
+            if st.button("تنزيل النسخة الاحتياطية الكاملة", use_container_width=True):
                 df_att_all = pd.read_sql_query("SELECT * FROM attendance_records", conn)
                 df_hifz_all = pd.read_sql_query("SELECT * FROM hifz_records", conn)
                 df_rev_all = pd.read_sql_query("SELECT * FROM review_records", conn)
@@ -251,9 +289,10 @@ if st.session_state['role'] == 'admin':
                     st.download_button(
                         label="📥 تنزيل النسخة الاحتياطية (Excel)", 
                         data=output_backup.getvalue(), 
-                        file_name=f"Bab_Al_Salam_Backup_{date.today()}.xlsx", 
+                        file_name=f"Quran_Center_Backup_{date.today()}.xlsx", 
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        type="primary"
+                        type="primary",
+                        use_container_width=True
                     )
                 else:
                     html_backup = f"""
@@ -264,7 +303,7 @@ if st.session_state['role'] == 'admin':
                     <h3>الحفظ</h3>{df_hifz_all.to_html(index=False)}
                     <h3>المراجعة</h3>{df_rev_all.to_html(index=False)}</body></html>
                     """
-                    st.download_button(label="📥 تنزيل النسخة الاحتياطية (PDF/HTML)", data=html_backup, file_name=f"Backup_{date.today()}.html", mime="text/html")
+                    st.download_button(label="📥 تنزيل النسخة الاحتياطية (PDF/HTML)", data=html_backup, file_name=f"Backup_{date.today()}.html", mime="text/html", use_container_width=True)
 
         elif export_option == "كشف الحضور والغياب الشبكي":
             df_att_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records", conn)
@@ -274,9 +313,9 @@ if st.session_state['role'] == 'admin':
                 if "Excel" in export_format_choice:
                     out_p = io.BytesIO()
                     df_pivot.to_excel(out_p, index=False)
-                    st.download_button("📥 تحميل الكشف كـ Excel", out_p.getvalue(), "كشف_الحضور.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    st.download_button("📥 تحميل الكشف كـ Excel", out_p.getvalue(), "كشف_الحضور.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 else:
-                    st.download_button("📥 تحميل الكشف كـ HTML/PDF", df_pivot.to_html(index=False), "كشف_الحضور.html", "text/html")
+                    st.download_button("📥 تحميل الكشف كـ HTML/PDF", df_pivot.to_html(index=False), "كشف_الحضور.html", "text/html", use_container_width=True)
 
         elif export_option == "كشف الحفظ الشبكي":
             df_hifz_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records", conn)
@@ -286,9 +325,9 @@ if st.session_state['role'] == 'admin':
                 if "Excel" in export_format_choice:
                     out_p = io.BytesIO()
                     df_pivot.to_excel(out_p, index=False)
-                    st.download_button("📥 تحميل الكشف كـ Excel", out_p.getvalue(), "كشف_الحفظ.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    st.download_button("📥 تحميل الكشف كـ Excel", out_p.getvalue(), "كشف_الحفظ.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 else:
-                    st.download_button("📥 تحميل الكشف كـ HTML/PDF", df_pivot.to_html(index=False), "كشف_الحفظ.html", "text/html")
+                    st.download_button("📥 تحميل الكشف كـ HTML/PDF", df_pivot.to_html(index=False), "كشف_الحفظ.html", "text/html", use_container_width=True)
 
         elif export_option == "كشف المراجعة الشبكي":
             df_rev_raw = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, (amount || ' [' || rating || ']') AS المراجعة FROM review_records", conn)
@@ -298,15 +337,14 @@ if st.session_state['role'] == 'admin':
                 if "Excel" in export_format_choice:
                     out_p = io.BytesIO()
                     df_pivot.to_excel(out_p, index=False)
-                    st.download_button("📥 تحميل الكشف كـ Excel", out_p.getvalue(), "كشف_المراجعة.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    st.download_button("📥 تحميل الكشف كـ Excel", out_p.getvalue(), "كشف_المراجعة.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True)
                 else:
-                    st.download_button("📥 تحميل الكشف كـ HTML/PDF", df_pivot.to_html(index=False), "كشف_المراجعة.html", "text/html")
+                    st.download_button("📥 تحميل الكشف كـ HTML/PDF", df_pivot.to_html(index=False), "كشف_المراجعة.html", "text/html", use_container_width=True)
 
-    # خيار مسح تجريبي شامل للبيانات
-    with st.sidebar.expander("🗑️ مسح بيانات التجربة"):
+    with st.sidebar.expander("🗑️ مسح وإعادة تعيين بيانات التجربة"):
         st.warning("⚠️ سيؤدي هذا الخيار إلى حذف جميع الطلاب، وحركات الحضور، وسجلات الحفظ والمراجعة نهائياً للبدء بنظافة.")
         confirm_reset = st.checkbox("أوافق على مسح كافة البيانات والتجارب", key="confirm_reset_box")
-        if st.button("🚨 مسح وإعادة تعيين البرنامج بالكامل", type="primary"):
+        if st.button("🚨 مسح وإعادة تعيين البرنامج بالكامل", type="primary", use_container_width=True):
             if confirm_reset:
                 cursor.execute("DELETE FROM attendance_records")
                 cursor.execute("DELETE FROM hifz_records")
@@ -320,7 +358,7 @@ if st.session_state['role'] == 'admin':
 
     st.sidebar.divider()
 
-st.title("📖 برنامج إدارة مركز التحفيظ")
+st.markdown("<h1 style='color: #0f766e; text-align: center;'>📖 برنامج إدارة مركز التحفيظ</h1>", unsafe_allow_html=True)
 
 cursor.execute("SELECT name FROM students ORDER BY name ASC")
 students_list = [row[0] for row in cursor.fetchall()]
@@ -331,7 +369,7 @@ else:
     entry_date = st.date_input("📅 تحديد تاريخ اليوم:", date.today())
     st.divider()
 
-    tab1, tab2, tab3, tab4 = st.tabs(["📝 الحضور والغياب الجماعي", "📖 الحفظ الجديد", "🔄 المراجعة", "🎯 متابعة تسلسل الأحزاب (مراجعة الحلقة)"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📝 الحضور والغياب الجماعي", "📖 الحفظ الجديد", "🔄 المراجعة", "🎯 متابعة تسلسل الأحزاب"])
 
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
@@ -349,7 +387,7 @@ else:
             attendance_results[student] = selected_status
             st.divider()
 
-        if st.button("💾 حفظ كشف الحضور لجميع الطلاب الظاهرين", type="primary"):
+        if st.button("💾 حفظ كشف الحضور لجميع الطلاب الظاهرين", type="primary", use_container_width=True):
             for student_name, status in attendance_results.items():
                 cursor.execute("DELETE FROM attendance_records WHERE date = ? AND student_name = ?", (str(entry_date), student_name))
                 cursor.execute("INSERT INTO attendance_records (date, student_name, status) VALUES (?, ?, ?)", (str(entry_date), student_name, status))
@@ -382,7 +420,7 @@ else:
                 st.success(f"تم اختيار الطالب: *{selected_student_hifz}*")
                 hifz_rating = st.radio("تقييم الحفظ اليوم:", ["جيد", "إعادة", "غائب"], horizontal=True, key="hifz_rate")
                 
-                if st.button("حفظ التسميع 💾", key="save_hifz", type="primary"):
+                if st.button("حفظ التسميع 💾", key="save_hifz", type="primary", use_container_width=True):
                     cursor.execute("DELETE FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_hifz))
                     cursor.execute("INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating) VALUES (?, ?, ?, ?, ?, ?)", (str(entry_date), selected_student_hifz, "-", 0, 0, hifz_rating))
                     conn.commit()
@@ -423,7 +461,7 @@ else:
                     st.session_state["show_hizb_grid"] = False
 
                 st.write("📖 *حزب المراجعة:*")
-                current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب (من الأعلى للأسفل تنازلياً) 🔻"
+                current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب (تنازلياً) 🔻"
                 if st.button(f"🟢 {current_hizb_text}", use_container_width=True, key="toggle_hizb_btn"):
                     st.session_state["show_hizb_grid"] = not st.session_state["show_hizb_grid"]
                     st.rerun()
@@ -441,7 +479,7 @@ else:
                     st.success(f"تم تحديد الحزب: *{review_hizb}*")
                     review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
                     
-                    if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
+                    if st.button("حفظ المراجعة 💾", key="save_rev", type="primary", use_container_width=True):
                         cursor.execute("DELETE FROM review_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_rev))
                         cursor.execute("INSERT INTO review_records (date, student_name, amount, rating) VALUES (?, ?, ?, ?)", (str(entry_date), selected_student_rev, review_hizb, review_rating))
                         conn.commit()
@@ -467,7 +505,7 @@ else:
         st.markdown("### 🎯 متابعة تسلسل الأحزاب (مراجعة الحلقة)")
         st.info("💡 *آلية النظام التصاعدية:* إذا اجتاز الطالب الحزب السابق بتقدير **(جيد)**، فإن النظام يحدد تلقائياً أن دوره اليوم هو مراجعة الحزب الذي يليه في الترتيب.")
         
-        search_target_hizb = st.selectbox("🔎 اختر الحزب المطلوب لمعرفة الطلاب المطالبين بمراجعته اليوم (من الحزب الأخير إلى الأول):", AHZAB_LIST_DESC, index=0, key="circle_review_search")
+        search_target_hizb = st.selectbox("🔎 اختر الحزب المطلوب لمعرفة الطلاب المطالبين بمراجعته اليوم:", AHZAB_LIST_DESC, index=0, key="circle_review_search")
         
         if search_target_hizb:
             target_index = AHZAB_LIST.index(search_target_hizb)
