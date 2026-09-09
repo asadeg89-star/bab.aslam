@@ -514,7 +514,7 @@ else:
                 st.info("لا توجد سجلات حفظ سابقة لهذا الطالب حتى الآن.")
 
     # --------------------------------------------------
-    # TAB 3: المراجعة (بدون كيبورد وبأسماء الأحزاب فقط)
+    # TAB 3: المراجعة (قائمة عمودية مترتبة بدقة بدون أخطاء الجوال)
     # --------------------------------------------------
     with tab3:
         st.markdown("### 🔄 تسجيل المراجعة")
@@ -543,10 +543,9 @@ else:
 
             if st.session_state["show_hizb_grid"]:
                 st.info("اضغط على اسم الحزب لاختياره مباشرة:")
-                cols = st.columns(2)
+                # عرض الأحزاب بشكل عمودي متسلسل بدقة تامة لتجنب تداخل الشاشات الصغيرة
                 for idx, hizb in enumerate(AHZAB_LIST):
-                    col = cols[idx % 2]
-                    if col.button(hizb, key=f"hizb_btn_{idx}", use_container_width=True):
+                    if st.button(hizb, key=f"hizb_btn_{idx}", use_container_width=True):
                         st.session_state["selected_hizb"] = hizb
                         st.session_state["show_hizb_grid"] = False
                         st.rerun()
