@@ -239,7 +239,9 @@ else:
         ["📝 الحضور والغياب المجمع", "📖 الحفظ الجديد", "🔄 المراجعة"]
     )
 
-    # 1. الحضور والغياب
+    # --------------------------------------------------
+    # TAB 1: الحضور والغياب (ويحتوي داخله على التصدير فقط)
+    # --------------------------------------------------
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
         search_att = st.text_input(
@@ -279,9 +281,101 @@ else:
             conn.commit()
             st.success("✅ تم حفظ الحضور بنجاح!")
 
-    # 2. الحفظ الجديد (مع العرض والرسم البياني للطالب المختار)
+        # قسم التصدير موجود هنا فقط داخل كشف الحضور
+        st.divider()
+        st.subheader("📊 تصدير بيانات الحضور إلى ملف Excel")
+
+        export_mode = st.radio(
+            "اختر طريقة التصدير المطلوبة:",
+            [
+                "تصدير كشف الحضور الجماعي (تنسيق شبكي أفقي)",
+                "تصدير طالب محدد فقط (تقرير شخصي كامل)",
+            ],
+            horizontal=True,
+        )
+
+        if export_mode == "تصدير طالب محدد فقط (تقرير شخصي كامل)":
+            single_student = st.selectbox(
+                "🔎 اختر اسم الطالب لتنزيل ملفه الخاص:",
+                students_list,
+                index=None,
+                placeholder="اضغط واكتب اسم الطالب...",
+                key="export_single_search",
+            )
+
+            if single_student:
+                df_att_single = pd.read_sql_query(
+                    f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student}' ORDER BY date DESC",
+                    conn,
+                )
+                df_hifz_single = pd.read_sql_query(
+                    f"SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student}' ORDER BY date DESC",
+                    conn,
+                )
+                df_rev_single = pd.read_sql_query(
+                    f"SELECT date AS التاريخ, student_name AS الطالب, amount AS مقدار_المراجعة, rating AS التقييم FROM review_records WHERE student_name = '{single_student}' ORDER BY date DESC",
+                    conn,
+                )
+
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                    df_att_single.to_excel(
+                        writer, index=False, sheet_name="سجل_الحضور"
+                    )
+                    df_hifz_single.to_excel(
+                        writer, index=False, sheet_name="سجل_الحفظ"
+                    )
+                    df_rev_single.to_excel(
+                        writer, index=False, sheet_name="سجل_المراجعة"
+                    )
+                excel_data = output.getvalue()
+
+                st.download_button(
+                    label=f"📥 تنزيل ملف Excel الخاص بـ ({single_student})",
+                    data=excel_data,
+                    file_name=f"تقرير_{single_student}_{date.today()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+
+        else:
+            df_att_raw = pd.read_sql_query(
+                "SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records",
+                conn,
+            )
+            if not df_att_raw.empty:
+                df_att_pivot = df_att_raw.pivot_table(
+                    index="التاريخ",
+                    columns="الطالب",
+                    values="الحالة",
+                    aggfunc="first",
+                ).reset_index()
+            else:
+                df_att_pivot = pd.DataFrame(columns=["التاريخ"])
+
+            st.write("##### معاينة جدول الحضور والغياب الشبكي:")
+            st.dataframe(df_att_pivot, use_container_width=True)
+
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                df_att_pivot.to_excel(
+                    writer, index=False, sheet_name="كشف_الحضور_الشبكي"
+                )
+            excel_data = output.getvalue()
+
+            st.download_button(
+                label="📥 تنزيل ملف Excel لكشف الحضور الشبكي",
+                data=excel_data,
+                file_name=f"كشف_الحضور_الشبكي_{date.today()}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+    # --------------------------------------------------
+    # TAB 2: الحفظ الجديد
+    # --------------------------------------------------
     with tab2:
-        st.markdown("### تسجيل الحفظ الجديد")
+        st.markdown("### 📖 تسجيل الحفظ الجديد")
+
+        # 1. إدخال وتحديد بيانات الطالب للحفظ أولاً
         selected_student_hifz = st_searchbox(
             search_students,
             placeholder="🔍 اكتب اسم الطالب أو الحرف الأول مباشرة...",
@@ -291,37 +385,14 @@ else:
         if selected_student_hifz:
             st.success(f"تم اختيار الطالب: *{selected_student_hifz}*")
 
-            # جلب وعرض بيانات الحفظ السابق للطالب المختار
-            df_student_hifz = pd.read_sql_query(
-                "SELECT date AS التاريخ, rating AS التقييم FROM hifz_records WHERE student_name = ? ORDER BY date DESC",
-                conn,
-                params=(selected_student_hifz,),
-            )
-
-            if not df_student_hifz.empty:
-                st.markdown(
-                    f"#### 📊 سجل حفظ الطالب السابق: *{selected_student_hifz}*"
-                )
-
-                # عرض رسم بياني لتوزيع تقييمات الطالب
-                rating_counts = df_student_hifz["التقييم"].value_counts()
-                st.bar_chart(rating_counts)
-
-                # عرض جدول البيانات لتقييمات الطالب
-                st.dataframe(df_student_hifz, use_container_width=True)
-            else:
-                st.info("لا توجد سجلات حفظ سابقة لهذا الطالب.")
-
-            st.divider()
-            st.markdown("#### ➕ إضافة تسميع جديد")
             hifz_rating = st.radio(
-                "تقييم الحفظ:",
+                "تقييم الحفظ اليوم:",
                 ["جيد", "إعادة"],
                 horizontal=True,
                 key="hifz_rate",
             )
 
-            if st.button("حفظ التسميع 💾", key="save_hifz"):
+            if st.button("حفظ التسميع 💾", key="save_hifz", type="primary"):
                 cursor.execute(
                     """
                     INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
@@ -340,9 +411,43 @@ else:
                 st.success(f"تم حفظ تسميع الطالب ({selected_student_hifz})!")
                 st.rerun()
 
-    # 3. المراجعة
+            st.divider()
+
+            # 2. عرض السجل والرسم البياني الأنيق للطالب بعد قسم الإدخال
+            st.markdown(
+                f"#### 📊 سجل ورسم بياني لـ الطالب: *{selected_student_hifz}*"
+            )
+
+            df_student_hifz = pd.read_sql_query(
+                "SELECT date AS التاريخ, rating AS التقييم FROM hifz_records WHERE student_name = ? ORDER BY date DESC",
+                conn,
+                params=(selected_student_hifz,),
+            )
+
+            if not df_student_hifz.empty:
+                # رسم بياني محسّن ومنظم باستخدام Pandas Chart
+                rating_counts = df_student_hifz[
+                    "التقييم"
+                ].value_counts().reset_index()
+                rating_counts.columns = ["التقييم", "العدد"]
+
+                st.bar_chart(
+                    data=rating_counts,
+                    x="التقييم",
+                    y="العدد",
+                    use_container_width=True,
+                )
+
+                # عرض جدول الحفظ السابق للطالب
+                st.dataframe(df_student_hifz, use_container_width=True)
+            else:
+                st.info("لا توجد سجلات حفظ سابقة لهذا الطالب حتى الآن.")
+
+    # --------------------------------------------------
+    # TAB 3: المراجعة
+    # --------------------------------------------------
     with tab3:
-        st.markdown("### تسجيل المراجعة")
+        st.markdown("### 🔄 تسجيل المراجعة")
         selected_student_rev = st_searchbox(
             search_students,
             placeholder="🔍 اكتب اسم الطالب أو الحرف الأول مباشرة...",
@@ -362,7 +467,7 @@ else:
             key="rev_rate",
         )
 
-        if st.button("حفظ المراجعة 💾", key="save_rev"):
+        if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
             if not selected_student_rev:
                 st.error("⚠️ يرجى اختيار اسم الطالب أولاً من قائمة البحث!")
             else:
@@ -380,89 +485,3 @@ else:
                 )
                 conn.commit()
                 st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev})!")
-
-# --------------------------------------------------
-# تصدير البيانات إلى Excel
-# --------------------------------------------------
-st.divider()
-st.subheader("📊 تصدير البيانات إلى ملف Excel")
-
-export_mode = st.radio(
-    "اختر طريقة التصدير المطلوبة:",
-    [
-        "تصدير كشف الحضور الجماعي (تنسيق شبكي أفقي)",
-        "تصدير طالب محدد فقط (تقرير شخصي كامل)",
-    ],
-    horizontal=True,
-)
-
-if export_mode == "تصدير طالب محدد فقط (تقرير شخصي كامل)":
-    single_student = st.selectbox(
-        "🔎 اختر اسم الطالب لتنزيل ملفه الخاص:",
-        students_list,
-        index=None,
-        placeholder="اضغط واكتب اسم الطالب...",
-        key="export_single_search",
-    )
-
-    if single_student:
-        df_att_single = pd.read_sql_query(
-            f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student}' ORDER BY date DESC",
-            conn,
-        )
-        df_hifz_single = pd.read_sql_query(
-            f"SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student}' ORDER BY date DESC",
-            conn,
-        )
-        df_rev_single = pd.read_sql_query(
-            f"SELECT date AS التاريخ, student_name AS الطالب, amount AS مقدار_المراجعة, rating AS التقييم FROM review_records WHERE student_name = '{single_student}' ORDER BY date DESC",
-            conn,
-        )
-
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df_att_single.to_excel(
-                writer, index=False, sheet_name="سجل_الحضور"
-            )
-            df_hifz_single.to_excel(writer, index=False, sheet_name="سجل_الحفظ")
-            df_rev_single.to_excel(
-                writer, index=False, sheet_name="سجل_المراجعة"
-            )
-        excel_data = output.getvalue()
-
-        st.download_button(
-            label=f"📥 تنزيل ملف Excel الخاص بـ ({single_student})",
-            data=excel_data,
-            file_name=f"تقرير_{single_student}_{date.today()}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-
-else:
-    # تصدير كشف الحضور الشبكي الأفقي فقط لجميع الطلاب
-    df_att_raw = pd.read_sql_query(
-        "SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records",
-        conn,
-    )
-    if not df_att_raw.empty:
-        df_att_pivot = df_att_raw.pivot_table(
-            index="التاريخ", columns="الطالب", values="الحالة", aggfunc="first"
-        ).reset_index()
-    else:
-        df_att_pivot = pd.DataFrame(columns=["التاريخ"])
-
-    st.write("##### معاينة جدول الحضور والغياب الشبكي:")
-    st.dataframe(df_att_pivot, use_container_width=True)
-
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df_att_pivot.to_excel(
-            writer, index=False, sheet_name="كشف_الحضور_الشبكي"
-        )
-    excel_data = output.getvalue()
-
-    st.download_button(
-        label="📥 تنزيل ملف Excel لكشف الحضور الشبكي",
-        data=excel_data,
-        file_name=f"كشف_الحضور_الشبكي_{date.today()}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
