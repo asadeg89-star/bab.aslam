@@ -118,6 +118,29 @@ st.markdown("""
         text-align: right !important; 
     }
     
+    /* تنسيق عنوان التطبيق ليكون متناسقاً ومرتباً */
+    .app-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: #f8fafc;
+        padding: 15px;
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+    .app-header h1 {
+        color: #0f766e;
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+    }
+    .app-header span {
+        font-size: 28px;
+    }
+
     /* تنسيق الجداول المخصصة */
     .custom-table {
         width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 15px; text-align: center; direction: rtl; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
@@ -358,7 +381,13 @@ if st.session_state['role'] == 'admin':
 
     st.sidebar.divider()
 
-st.markdown("<h1 style='color: #0f766e; text-align: center;'>📖 مركز تحفيظ باب السلام</h1>", unsafe_allow_html=True)
+# عرض الاسم بشكل مرتب ومنسق في سطر واحد مع الأيقونة
+st.markdown("""
+    <div class="app-header">
+        <span>📖</span>
+        <h1>مركز تحفيظ باب السلام</h1>
+    </div>
+""", unsafe_allow_html=True)
 
 cursor.execute("SELECT name FROM students ORDER BY name ASC")
 students_list = [row[0] for row in cursor.fetchall()]
