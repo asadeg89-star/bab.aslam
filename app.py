@@ -9,6 +9,25 @@ from streamlit_searchbox import st_searchbox
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
 cursor = conn.cursor()
 
+# جدول المستخدمين للتسجيل والدخول
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT,
+    role TEXT
+)
+""")
+
+# إنشاء حساب أدمن رئيسي افتراضي إذا لم يكن موجوداً
+cursor.execute("SELECT * FROM users WHERE username = 'admin'")
+if not cursor.fetchone():
+    cursor.execute(
+        "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+        ("admin", "admin123", "admin"),
+    )
+    conn.commit()
+
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS students (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,72 +71,128 @@ st.set_page_config(
     page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered"
 )
 
-# --------------------------------------------------
-# إصلاح التنسيق والمحاذاة للعربية بدون إفساد القائمة الجانبية
-# --------------------------------------------------
+# تنسيق الاتجاه RTL
 st.markdown(
     """
     <style>
-    /* محاذاة المحتوى الرئيسي فقط من اليمين إلى اليسار */
-    .stMainBlockContainer {
-        direction: rtl !important;
-        text-align: right !important;
+    .stMainBlockContainer { direction: rtl !important; text-align: right !important; }
+    .stMainBlockContainer div, .stMainBlockContainer p, .stMainBlockContainer label, 
+    .stMainBlockContainer h1, .stMainBlockContainer h2, .stMainBlockContainer h3 {
+        text-align: right !important; direction: rtl !important;
     }
-    
-    /* محاذاة النصوص والعناوين والخيارات داخل الصفحة */
-    .stMainBlockContainer div, 
-    .stMainBlockContainer p, 
-    .stMainBlockContainer label, 
-    .stMainBlockContainer h1, 
-    .stMainBlockContainer h2, 
-    .stMainBlockContainer h3 {
-        text-align: right !important;
-        direction: rtl !important;
-    }
-
-    /* إصلاح القائمة الجانبية وتفادي التداخل */
-    section[data-testid="stSidebar"] {
-        direction: ltr !important;
-    }
-    section[data-testid="stSidebar"] * {
-        direction: rtl !important;
-        text-align: right !important;
-    }
+    section[data-testid="stSidebar"] { direction: ltr !important; }
+    section[data-testid="stSidebar"] * { direction: rtl !important; text-align: right !important; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-st.title("📖 برنامج إدارة مركز التحفيظ")
+# --------------------------------------------------
+# نظام تسجيل الدخول وإدارة الجلسة
+# --------------------------------------------------
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+    st.session_state["username"] = ""
+    st.session_state["role"] = ""
 
-# 2. القائمة الجانبية لإدارة الطلاب (إضافة + إزالة)
-st.sidebar.header("⚙️ إدارة الطلاب")
+if not st.session_state["authenticated"]:
+    st.title("🔐 تسجيل الدخول للبرنامج")
+    
+    with st.form("login_form"):
+        username_input = st.text_input("اسم المستخدم:")
+        password_input = st.text_input("كلمة المرور:", type="password")
+        submit_login = st.form_submit_button("تسجيل الدخول", type="primary")
 
-# قسم إضافة طالب
-st.sidebar.subheader("➕ إضافة طالب جديد")
-new_student = st.sidebar.text_input("اسم الطالب الجديد:")
-if st.sidebar.button("إضافة الطالب"):
-    if new_student.strip() != "":
-        try:
+        if submit_login:
             cursor.execute(
-                "INSERT INTO students (name) VALUES (?)", (new_student.strip(),)
+                "SELECT role FROM users WHERE username = ? AND password = ?",
+                (username_input.strip(), password_input.strip()),
             )
-            conn.commit()
-            st.sidebar.success(f"تمت إضافة الطالب: {new_student}")
-            st.rerun()
-        except sqlite3.IntegrityError:
-            st.sidebar.error("هذا الاسم موجود بالفعل!")
-    else:
-        st.sidebar.warning("يرجى كتابة اسم الطالب.")
+            user_match = cursor.fetchone()
+
+            if user_match:
+                st.session_state["authenticated"] = True
+                st.session_state["username"] = username_input.strip()
+                st.session_state["role"] = user_match[0]
+                st.success("تم تسجيل الدخول بنجاح!")
+                st.rerun()
+            else:
+                st.error("اسم المستخدم أو كلمة المرور غير صحيحة.")
+    st.stop()
+
+# --------------------------------------------------
+# الواجهة الرئيسية بعد تسجيل الدخول
+# --------------------------------------------------
+st.sidebar.markdown(f"👤 مرحباً بك: *{st.session_state['username']}*")
+st.sidebar.caption(
+    f"الرتبة: {'مدير النظام (رئيسي)' if st.session_state['role'] == 'admin' else 'معلم (مستخدم)'}"
+)
+
+if st.sidebar.button("🚪 تسجيل الخروج"):
+    st.session_state["authenticated"] = False
+    st.session_state["username"] = ""
+    st.session_state["role"] = ""
+    st.rerun()
 
 st.sidebar.divider()
+st.title("📖 برنامج إدارة مركز التحفيظ")
 
-# جلب قائمة الطلاب الحالية مرتبة أبجدياً
+# --------------------------------------------------
+# قسم إدارة المستخدمين (للمستخدم الرئيسي Admin فقط)
+# --------------------------------------------------
+if st.session_state["role"] == "admin":
+    st.sidebar.header("👑 إدارة حسابات المستخدمين")
+    new_user = st.sidebar.text_input("اسم مستخدم جديد:", key="add_user_name")
+    new_pass = st.sidebar.text_input(
+        "كلمة المرور:", type="password", key="add_user_pass"
+    )
+
+    if st.sidebar.button("إضافة مستخدم جديد"):
+        if new_user.strip() and new_pass.strip():
+            try:
+                cursor.execute(
+                    "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+                    (new_user.strip(), new_pass.strip(), "user"),
+                )
+                conn.commit()
+                st.sidebar.success(f"تم إنشاء حساب للمستخدم: {new_user}")
+            except sqlite3.IntegrityError:
+                st.sidebar.error("اسم المستخدم هذا مسجل مسبقاً.")
+        else:
+            st.sidebar.warning("يرجى ملء كافة البيانات.")
+
+    st.sidebar.divider()
+
+# --------------------------------------------------
+# إدارة الطلاب (لليوزر الرئيسي فقط أو للجميع حسب الصلاحيات)
+# --------------------------------------------------
+st.sidebar.header("⚙️ إدارة الطلاب")
+
+if st.session_state["role"] == "admin":
+    st.sidebar.subheader("➕ إضافة طالب جديد")
+    new_student = st.sidebar.text_input("اسم الطالب الجديد:")
+    if st.sidebar.button("إضافة الطالب"):
+        if new_student.strip() != "":
+            try:
+                cursor.execute(
+                    "INSERT INTO students (name) VALUES (?)",
+                    (new_student.strip(),),
+                )
+                conn.commit()
+                st.sidebar.success(f"تمت إضافة الطالب: {new_student}")
+                st.rerun()
+            except sqlite3.IntegrityError:
+                st.sidebar.error("هذا الاسم موجود بالفعل!")
+        else:
+            st.sidebar.warning("يرجى كتابة اسم الطالب.")
+
+    st.sidebar.divider()
+
+# جلب قائمة الطلاب
 cursor.execute("SELECT name FROM students ORDER BY name ASC")
 students_list = [row[0] for row in cursor.fetchall()]
 
 
-# دالة البحث اللايف (Live Search) لتصفية الأسماء مباشرة
 def search_students(search_term: str):
     if not search_term:
         return students_list
@@ -128,28 +203,28 @@ def search_students(search_term: str):
     ]
 
 
-# قسم إزالة طالب
-st.sidebar.subheader("🗑️ إزالة طالب")
-if students_list:
-    student_to_remove = st.sidebar.selectbox(
-        "اختر الطالب المراد إزالته:",
-        students_list,
-        index=None,
-        placeholder="اختر الطالب للحذف...",
-        key="remove_select",
-    )
-    if st.sidebar.button("حذف الطالب", type="secondary"):
-        if student_to_remove:
-            cursor.execute(
-                "DELETE FROM students WHERE name = ?", (student_to_remove,)
-            )
-            conn.commit()
-            st.sidebar.success(f"تمت إزالة الطالب ({student_to_remove}) بنجاح!")
-            st.rerun()
-        else:
-            st.sidebar.warning("يرجى اختيار طالب أولاً لإزالته.")
-else:
-    st.sidebar.info("لا يوجد طلاب مضافون حالياً.")
+if st.session_state["role"] == "admin":
+    st.sidebar.subheader("🗑️ إزالة طالب")
+    if students_list:
+        student_to_remove = st.sidebar.selectbox(
+            "اختر الطالب المراد إزالته:",
+            students_list,
+            index=None,
+            placeholder="اختر الطالب للحذف...",
+            key="remove_select",
+        )
+        if st.sidebar.button("حذف الطالب", type="secondary"):
+            if student_to_remove:
+                cursor.execute(
+                    "DELETE FROM students WHERE name = ?", (student_to_remove,)
+                )
+                conn.commit()
+                st.sidebar.success(
+                    f"تمت إزالة الطالب ({student_to_remove}) بنجاح!"
+                )
+                st.rerun()
+            else:
+                st.sidebar.warning("يرجى اختيار طالب أولاً لإزالته.")
 
 # --------------------------------------------------
 # الواجهة الرئيسية لتسجيل البيانات
@@ -164,10 +239,9 @@ else:
         ["📝 الحضور والغياب المجمع", "📖 الحفظ الجديد", "🔄 المراجعة"]
     )
 
-    # --- 1. قسم الحضور والغياب المجمع ---
+    # 1. الحضور والغياب
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
-
         search_att = st.text_input(
             "🔍 تصفية القائمة بكتابة بداية الاسم:", "", key="search_att"
         )
@@ -176,8 +250,6 @@ else:
             for s in students_list
             if s.lower().startswith(search_att.strip().lower())
         ]
-
-        st.caption("حدد حالة كل طالب ثم اضغط على زر الحفظ النهائي بالأسفل:")
 
         attendance_results = {}
         status_options = ["حضور", "غياب", "غياب بعذر", "تأخير"]
@@ -205,14 +277,11 @@ else:
                     (str(entry_date), student_name, status),
                 )
             conn.commit()
-            st.success(
-                f"✅ تم حفظ حضور {len(attendance_results)} طالب بتاريخ {entry_date} بنجاح!"
-            )
+            st.success("✅ تم حفظ الحضور بنجاح!")
 
-    # --- 2. قسم الحفظ الجديد ---
+    # 2. الحفظ الجديد
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
-
         selected_student_hifz = st_searchbox(
             search_students,
             placeholder="🔍 اكتب اسم الطالب أو الحرف الأول مباشرة...",
@@ -223,12 +292,8 @@ else:
             st.success(f"تم اختيار الطالب: *{selected_student_hifz}*")
 
         st.divider()
-
         hifz_rating = st.radio(
-            "تقييم الحفظ:",
-            ["جيد", "إعادة"],
-            horizontal=True,
-            key="hifz_rate",
+            "تقييم الحفظ:", ["جيد", "إعادة"], horizontal=True, key="hifz_rate"
         )
 
         if st.button("حفظ التسميع 💾", key="save_hifz"):
@@ -250,14 +315,11 @@ else:
                     ),
                 )
                 conn.commit()
-                st.success(
-                    f"تم حفظ تسميع الطالب ({selected_student_hifz}) وتقييمه: [{hifz_rating}] بنجاح!"
-                )
+                st.success(f"تم حفظ تسميع الطالب ({selected_student_hifz})!")
 
-    # --- 3. قسم المراجعة ---
+    # 3. المراجعة
     with tab3:
         st.markdown("### تسجيل المراجعة")
-
         selected_student_rev = st_searchbox(
             search_students,
             placeholder="🔍 اكتب اسم الطالب أو الحرف الأول مباشرة...",
@@ -268,7 +330,6 @@ else:
             st.success(f"تم اختيار الطالب: *{selected_student_rev}*")
 
         st.divider()
-
         review_amount = st.text_input(
             "مقدار المراجعة:", "من سورة يس إلى الواقعة", key="rev_amount"
         )
@@ -277,6 +338,7 @@ else:
             ["ممتاز", "جيد جداً", "جيد", "لم يراجع"],
             key="rev_rate",
         )
+
         if st.button("حفظ المراجعة 💾", key="save_rev"):
             if not selected_student_rev:
                 st.error("⚠️ يرجى اختيار اسم الطالب أولاً من قائمة البحث!")
@@ -294,12 +356,10 @@ else:
                     ),
                 )
                 conn.commit()
-                st.success(
-                    f"تم حفظ مراجعة الطالب ({selected_student_rev}) بنجاح!"
-                )
+                st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev})!")
 
 # --------------------------------------------------
-# قسم تصدير واستعراض البيانات
+# تصدير البيانات (متاح للجميع أو حسب الحاجة)
 # --------------------------------------------------
 st.divider()
 st.subheader("📊 تصدير البيانات إلى ملف Excel")
