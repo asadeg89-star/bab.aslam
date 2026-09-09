@@ -7,7 +7,71 @@ import altair as alt
 
 st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
 
-# 1. إعداد قاعدة البيانات وتأسيس الجداول
+# 1. إعداد قائمة أحزاب القرآن الـ 60 مرتبة تنازلياً (من 60 إلى 1)
+AHZAB_LIST = [
+    "الحزب 60 - الأعلى",
+    "الحزب 59 - النبأ",
+    "الحزب 58 - الجن",
+    "الحزب 57 - الملك",
+    "الحزب 56 - الجمعة",
+    "الحزب 55 - المجادلة",
+    "الحزب 54 - الرحمن",
+    "الحزب 53 - قال فما خطبكم",
+    "الحزب 52 - لقد رضي",
+    "الحزب 51 - الأحقاف",
+    "الحزب 50 - قل أولو جئتكم",
+    "الحزب 49 - إليه يرد",
+    "الحزب 48 - وبقوم مالي",
+    "الحزب 47 - فمن أظلم",
+    "الحزب 46 - فنبذناه",
+    "الحزب 45 - وما أنزلنا",
+    "الحزب 44 - قل من يرزقكم",
+    "الحزب 43 - إن المسلمين",
+    "الحزب 42 - ومن يسلم",
+    "الحزب 41 - ولا تجادلوا",
+    "الحزب 40 - ولقد وصلنا",
+    "الحزب 39 - قل الحمد لله",
+    "الحزب 38 - قالوا أأنؤمن",
+    "الحزب 37 - وقال الذين لا يرجون",
+    "الحزب 36 - يأيها الذين آمنوا",
+    "الحزب 35 - المؤمنون",
+    "الحزب 34 - الحج",
+    "الحزب 33 - الأنبياء",
+    "الحزب 32 - طه",
+    "الحزب 31 - قال ألم أقل لك",
+    "الحزب 30 - أولم يَرَوْا",
+    "الحزب 29 - سبحان الذي",
+    "الحزب 28 - وقال الله",
+    "الحزب 27 - الحجر",
+    "الحزب 26 - أمن يعلم",
+    "الحزب 25 - وما أبرئ",
+    "الحزب 24 - وإلى مدين",
+    "الحزب 23 - وما من دابة",
+    "الحزب 22 - الذين أحسنوا",
+    "الحزب 21 - إنما السبيل",
+    "الحزب 20 - يأيها الذين آمنوا",
+    "الحزب 19 - واعلموا",
+    "الحزب 18 - وإذ نتقنا",
+    "الحزب 17 - قال الملأ",
+    "الحزب 16 - الأعراف",
+    "الحزب 15 - ولو أننا نزلنا",
+    "الحزب 14 - إنما يستجيب",
+    "الحزب 13 - لتجدن",
+    "الحزب 12 - قال رجلان",
+    "الحزب 11 - لا يحب",
+    "الحزب 10 - الله لا إله إلا هو",
+    "الحزب 9 - والمحصنات",
+    "الحزب 8 - يستبشرون",
+    "الحزب 7 - لن تنالوا",
+    "الحزب 6 - قل أؤنبئكم",
+    "الحزب 5 - تلك الرسل",
+    "الحزب 4 - واذكروا الله",
+    "الحزب 3 - سيقول",
+    "الحزب 2 - وإذا لقوا",
+    "الحزب 1 - الفاتحة"
+]
+
+# 2. إعداد قاعدة البيانات وتأسيس الجداول
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
 cursor = conn.cursor()
 
@@ -125,7 +189,6 @@ if "authenticated" not in st.session_state:
     st.session_state["username"] = ""
     st.session_state["role"] = ""
 
-# التثبت من الجلسة عبر رابط الصفحة
 if "user" in st.query_params:
     logged_username = st.query_params["user"]
     cursor.execute("SELECT role FROM users WHERE username = ?", (logged_username,))
@@ -135,7 +198,6 @@ if "user" in st.query_params:
         st.session_state["username"] = logged_username
         st.session_state["role"] = user_data[0]
 
-# شاشة تسجيل الدخول
 if not st.session_state["authenticated"]:
     st.title("🔐 تسجيل الدخول للبرنامج")
     
@@ -153,9 +215,7 @@ if not st.session_state["authenticated"]:
                 st.session_state["username"] = username_input.strip()
                 st.session_state["role"] = user_match[0]
                 
-                # حفظ المستخدم في الرابط لإبقاء الجلسة عند تحديث الصفحة
                 st.query_params["user"] = username_input.strip()
-                
                 st.success("تم تسجيل الدخول بنجاح!")
                 st.rerun()
             else:
@@ -172,8 +232,6 @@ if st.sidebar.button("🚪 تسجيل الخروج"):
     st.session_state["authenticated"] = False
     st.session_state["username"] = ""
     st.session_state["role"] = ""
-    
-    # مسح المستخدم من الرابط عند تسجيل الخروج
     st.query_params.clear()
     st.rerun()
 
@@ -313,7 +371,7 @@ else:
             if single_student:
                 df_att_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, status AS حالة_الحضور FROM attendance_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
                 df_hifz_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
-                df_rev_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, amount AS مقدار_المراجعة, rating AS التقييم FROM review_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
+                df_rev_single = pd.read_sql_query(f"SELECT date AS التاريخ, student_name AS الطالب, amount AS حزب_المراجعة, rating AS التقييم FROM review_records WHERE student_name = '{single_student}' ORDER BY date DESC", conn)
                 
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -471,17 +529,72 @@ else:
         if selected_student_rev:
             st.success(f"تم اختيار الطالب: *{selected_student_rev}*")
 
-        st.divider()
-        review_amount = st.text_input("مقدار المراجعة:", "من سورة يس إلى الواقعة", key="rev_amount")
-        review_rating = st.selectbox("تقييم المراجعة:", ["ممتاز", "جيد جداً", "جيد", "لم يراجع"], key="rev_rate")
-        
-        if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
-            if not selected_student_rev:
-                st.error("⚠️ يرجى اختيار اسم الطالب أولاً من قائمة البحث!")
-            else:
+            # قائمة منسدلة بالأحزاب الـ 60 (تنازلياً)
+            review_hizb = st.selectbox(
+                "📖 حزب المراجعة:",
+                AHZAB_LIST,
+                index=0,
+                key="rev_hizb_select"
+            )
+            
+            review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
+            
+            if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
                 cursor.execute("""
                     INSERT INTO review_records (date, student_name, amount, rating)
                     VALUES (?, ?, ?, ?)
-                """, (str(entry_date), selected_student_rev, review_amount, review_rating))
+                """, (str(entry_date), selected_student_rev, review_hizb, review_rating))
                 conn.commit()
-                st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev})!")
+                st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev}) بنجاح!")
+                st.rerun()
+
+            st.divider()
+
+            # عرض الجدول والتشارت مثل قائمة الحفظ
+            st.markdown(f"#### 📊 سجل مراجعة الطالب (آخر 10 نتائج): *{selected_student_rev}*")
+
+            df_student_rev = pd.read_sql_query(
+                "SELECT date AS التاريخ, amount AS حزب_المراجعة, rating AS التقييم FROM review_records WHERE student_name = ? ORDER BY date DESC, id DESC LIMIT 10",
+                conn, params=(selected_student_rev,)
+            )
+
+            if not df_student_rev.empty:
+                html_table = "<table class='custom-table'><thead><tr><th>التاريخ</th><th>حزب المراجعة</th><th>التقييم</th></tr></thead><tbody>"
+                for _, row in df_student_rev.iterrows():
+                    badge = "badge-good" if row['التقييم'] == "جيد" else "badge-retry"
+                    html_table += f"<tr><td>{row['التاريخ']}</td><td>{row['حزب_المراجعة']}</td><td><span class='{badge}'>{row['التقييم']}</span></td></tr>"
+                html_table += "</tbody></table>"
+
+                st.markdown(html_table, unsafe_allow_html=True)
+
+                st.divider()
+
+                rating_counts = df_student_rev['التقييم'].value_counts().reset_index()
+                rating_counts.columns = ['التقييم', 'العدد']
+
+                bars = alt.Chart(rating_counts).mark_bar(
+                    cornerRadiusTopLeft=10,
+                    cornerRadiusTopRight=10,
+                    width=60
+                ).encode(
+                    x=alt.X('التقييم:N', title='نوع التقييم', axis=alt.Axis(labelAngle=0, labelFontSize=14, titleFontSize=14)),
+                    y=alt.Y('العدد:Q', title='عدد المرات', axis=alt.Axis(labelFontSize=12, titleFontSize=14)),
+                    color=alt.Color('التقييم:N', scale=alt.Scale(domain=['جيد', 'إعادة'], range=['#10b981', '#ef4444']), legend=None),
+                    tooltip=['التقييم', 'العدد']
+                )
+
+                text = bars.mark_text(
+                    align='center',
+                    baseline='bottom',
+                    dy=-5,
+                    fontSize=14,
+                    fontWeight='bold'
+                ).encode(
+                    text='العدد:Q'
+                )
+
+                chart = (bars + text).properties(height=280)
+
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.info("لا توجد سجلات مراجعة سابقة لهذا الطالب حتى الآن.")
