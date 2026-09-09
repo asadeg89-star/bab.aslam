@@ -355,19 +355,24 @@ else:
 
             st.divider()
 
-            # الرسم البياني العمودي المحسّن
             st.markdown(f"#### 📊 سجل إنجاز الطالب: *{selected_student_hifz}*")
 
+            # جلب البيانات مرتبة من الأحدث إلى الأقدم حسب التاريخ
             df_student_hifz = pd.read_sql_query(
-                "SELECT date AS التاريخ, rating AS التقييم FROM hifz_records WHERE student_name = ? ORDER BY date DESC",
+                "SELECT date AS التاريخ, rating AS التقييم FROM hifz_records WHERE student_name = ? ORDER BY date DESC, id DESC",
                 conn, params=(selected_student_hifz,)
             )
 
             if not df_student_hifz.empty:
+                # 1. عرض جدول البيانات أولاً (مرتب من الأحدث إلى الأقدم)
+                st.dataframe(df_student_hifz, use_container_width=True)
+
+                st.divider()
+
+                # 2. عرض الرسم البياني (Chart) ثانياً
                 rating_counts = df_student_hifz['التقييم'].value_counts().reset_index()
                 rating_counts.columns = ['التقييم', 'العدد']
 
-                # أشرطة عمودية محسّنة وأنيقة
                 bars = alt.Chart(rating_counts).mark_bar(
                     cornerRadiusTopLeft=10,
                     cornerRadiusTopRight=10,
@@ -379,7 +384,6 @@ else:
                     tooltip=['التقييم', 'العدد']
                 )
 
-                # كتابة الأعداد فوق الأعمدة العمودية
                 text = bars.mark_text(
                     align='center',
                     baseline='bottom',
@@ -393,7 +397,6 @@ else:
                 chart = (bars + text).properties(height=280)
 
                 st.altair_chart(chart, use_container_width=True)
-                st.dataframe(df_student_hifz, use_container_width=True)
             else:
                 st.info("لا توجد سجلات حفظ سابقة لهذا الطالب حتى الآن.")
 
