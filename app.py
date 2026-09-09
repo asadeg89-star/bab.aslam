@@ -302,6 +302,22 @@ if st.session_state['role'] == 'admin':
                 else:
                     st.download_button("📥 تحميل الكشف كـ HTML/PDF", df_pivot.to_html(index=False), "كشف_المراجعة.html", "text/html")
 
+    # خيار مسح تجريبي شامل للبيانات
+    with st.sidebar.expander("🗑️ مسح بيانات التجربة"):
+        st.warning("⚠️ سيؤدي هذا الخيار إلى حذف جميع الطلاب، وحركات الحضور، وسجلات الحفظ والمراجعة نهائياً للبدء بنظافة.")
+        confirm_reset = st.checkbox("أوافق على مسح كافة البيانات والتجارب", key="confirm_reset_box")
+        if st.button("🚨 مسح وإعادة تعيين البرنامج بالكامل", type="primary"):
+            if confirm_reset:
+                cursor.execute("DELETE FROM attendance_records")
+                cursor.execute("DELETE FROM hifz_records")
+                cursor.execute("DELETE FROM review_records")
+                cursor.execute("DELETE FROM students")
+                conn.commit()
+                st.success("✅ تم مسح كافة البيانات بنجاح وأصبح البرنامج نظيفاً وجاهزاً.")
+                st.rerun()
+            else:
+                st.error("يرجى تحديد مربع التأكيد أولاً.")
+
     st.sidebar.divider()
 
 st.title("📖 برنامج إدارة مركز التحفيظ")
@@ -414,7 +430,6 @@ else:
 
                 if st.session_state["show_hizb_grid"]:
                     st.info("اضغط على اسم الحزب لاختياره مباشرة (الترتيب تنازلي من النهاية للبداية):")
-                    # عرض الشبكة بالترتيب التنازلي (من الحزب 60 وحتى الحزب 1)
                     for idx, hizb in enumerate(AHZAB_LIST_DESC):
                         if st.button(hizb, key=f"hizb_btn_{idx}", use_container_width=True):
                             st.session_state["selected_hizb"] = hizb
@@ -452,7 +467,6 @@ else:
         st.markdown("### 🎯 متابعة تسلسل الأحزاب (مراجعة الحلقة)")
         st.info("💡 *آلية النظام التصاعدية:* إذا اجتاز الطالب الحزب السابق بتقدير **(جيد)**، فإن النظام يحدد تلقائياً أن دوره اليوم هو مراجعة الحزب الذي يليه في الترتيب.")
         
-        # القائمة المنسدلة للبحث في متابعة الحلقة أصبحت تنازلياً أيضاً لتوحيد الواجهة
         search_target_hizb = st.selectbox("🔎 اختر الحزب المطلوب لمعرفة الطلاب المطالبين بمراجعته اليوم (من الحزب الأخير إلى الأول):", AHZAB_LIST_DESC, index=0, key="circle_review_search")
         
         if search_target_hizb:
