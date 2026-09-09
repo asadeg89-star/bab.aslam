@@ -398,7 +398,13 @@ students_list = [row[0] for row in cursor.fetchall()]
 if not students_list:
     st.info("👈 لا يوجد طلاب مضافون بعد! قم بإضافة الطلاب من القائمة الجانبية (لوحة تحكم المدير).")
 else:
-    entry_date = st.date_input("📅 تحديد تاريخ اليوم:", date.today())
+    # تحديد التاريخ: يظهر حصرياً للمدير، بينما باقي الأعضاء يُحدد تلقائياً بتاريخ اليوم
+    if st.session_state['role'] == 'admin':
+        entry_date = st.date_input("📅 تحديد التاريخ (خاص بمدير النظام):", date.today())
+    else:
+        entry_date = date.today()
+        st.caption(f"📅 تاريخ التسجيل اليوم: *{entry_date}*")
+
     st.divider()
 
     tab1, tab2, tab3, tab4 = st.tabs(["📝 الحضور والغياب الجماعي", "📖 الحفظ الجديد", "🔄 المراجعة", "🎯 متابعة تسلسل الأحزاب"])
