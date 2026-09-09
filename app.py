@@ -3,6 +3,7 @@ from datetime import date
 import io
 import pandas as pd
 import streamlit as st
+import altair as alt
 from streamlit_searchbox import st_searchbox
 
 # 1. إعداد قاعدة البيانات وتأسيس الجداول
@@ -236,11 +237,11 @@ else:
     st.divider()
 
     tab1, tab2, tab3 = st.tabs(
-        ["📝 الحضور والغياب المجمع", "📖 الحفظ الجديد", "🔄 المراجعة"]
+        ["📝 الحضور والغياب المجمع والتصدير", "📖 الحفظ الجديد", "🔄 المراجعة"]
     )
 
     # --------------------------------------------------
-    # TAB 1: الحضور والغياب (ويحتوي داخله على التصدير فقط)
+    # TAB 1: الحضور والغياب وتصدير البيانات
     # --------------------------------------------------
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
@@ -281,20 +282,23 @@ else:
             conn.commit()
             st.success("✅ تم حفظ الحضور بنجاح!")
 
-        # قسم التصدير موجود هنا فقط داخل كشف الحضور
+        # --------------------------------------------------
+        # قسم تصدير البيانات إلى Excel (شامل الحضور، الحفظ، المراجعة)
+        # --------------------------------------------------
         st.divider()
-        st.subheader("📊 تصدير بيانات الحضور إلى ملف Excel")
+        st.subheader("📊 تصدير السجلات إلى ملف Excel")
 
-        export_mode = st.radio(
-            "اختر طريقة التصدير المطلوبة:",
+        export_option = st.selectbox(
+            "اختر نوع الكشف المراد معاينته وتنزيله:",
             [
-                "تصدير كشف الحضور الجماعي (تنسيق شبكي أفقي)",
-                "تصدير طالب محدد فقط (تقرير شخصي كامل)",
+                "كشف الحضور والغياب الشبكي",
+                "كشف الحفظ الشبكي",
+                "كشف المراجعة الشبكي",
+                "تقرير شخصي كامل لطالب محدد",
             ],
-            horizontal=True,
         )
 
-        if export_mode == "تصدير طالب محدد فقط (تقرير شخصي كامل)":
+        if export_option == "تقرير شخصي كامل لطالب محدد":
             single_student = st.selectbox(
                 "🔎 اختر اسم الطالب لتنزيل ملفه الخاص:",
                 students_list,
@@ -331,41 +335,97 @@ else:
                 excel_data = output.getvalue()
 
                 st.download_button(
-                    label=f"📥 تنزيل ملف Excel الخاص بـ ({single_student})",
+                    label=f"📥 تنزيل ملف Excel الشامل لـ ({single_student})",
                     data=excel_data,
                     file_name=f"تقرير_{single_student}_{date.today()}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
 
-        else:
+        elif export_option == "كشف الحضور والغياب الشبكي":
             df_att_raw = pd.read_sql_query(
                 "SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records",
                 conn,
             )
-            if not df_att_raw.empty:
-                df_att_pivot = df_att_raw.pivot_table(
+            df_pivot = (
+                df_att_raw.pivot_table(
                     index="التاريخ",
                     columns="الطالب",
                     values="الحالة",
                     aggfunc="first",
                 ).reset_index()
-            else:
-                df_att_pivot = pd.DataFrame(columns=["التاريخ"])
+                if not df_att_raw.empty
+                else pd.DataFrame(columns=["التاريخ"])
+            )
 
-            st.write("##### معاينة جدول الحضور والغياب الشبكي:")
-            st.dataframe(df_att_pivot, use_container_width=True)
-
+            st.dataframe(df_pivot, use_container_width=True)
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                df_att_pivot.to_excel(
-                    writer, index=False, sheet_name="كشف_الحضور_الشبكي"
+                df_pivot.to_excel(
+                    writer, index=False, sheet_name="كشف_الحضور"
                 )
-            excel_data = output.getvalue()
 
             st.download_button(
-                label="📥 تنزيل ملف Excel لكشف الحضور الشبكي",
-                data=excel_data,
-                file_name=f"كشف_الحضور_الشبكي_{date.today()}.xlsx",
+                label="📥 تنزيل كشف الحضور والغياب الشبكي",
+                data=output.getvalue(),
+                file_name=f"كشف_الحضور_{date.today()}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+        elif export_option == "كشف الحفظ الشبكي":
+            df_hifz_raw = pd.read_sql_query(
+                "SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM hifz_records",
+                conn,
+            )
+            df_pivot = (
+                df_hifz_raw.pivot_table(
+                    index="التاريخ",
+                    columns="الطالب",
+                    values="التقييم",
+                    aggfunc="first",
+                ).reset_index()
+                if not df_hifz_raw.empty
+                else pd.DataFrame(columns=["التاريخ"])
+            )
+
+            st.dataframe(df_pivot, use_container_width=True)
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                df_pivot.to_excel(writer, index=False, sheet_name="كشف_الحفظ")
+
+            st.download_button(
+                label="📥 تنزيل كشف الحفظ الشبكي",
+                data=output.getvalue(),
+                file_name=f"كشف_الحفظ_{date.today()}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+        elif export_option == "كشف المراجعة الشبكي":
+            df_rev_raw = pd.read_sql_query(
+                "SELECT date AS التاريخ, student_name AS الطالب, (amount || ' [' || rating || ']') AS المراجعة FROM review_records",
+                conn,
+            )
+            df_pivot = (
+                df_rev_raw.pivot_table(
+                    index="التاريخ",
+                    columns="الطالب",
+                    values="المراجعة",
+                    aggfunc="first",
+                ).reset_index()
+                if not df_rev_raw.empty
+                else pd.DataFrame(columns=["التاريخ"])
+            )
+
+            st.dataframe(df_pivot, use_container_width=True)
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                df_pivot.to_excel(
+                    writer, index=False, sheet_name="كشف_المراجعة"
+                )
+
+            st.download_button(
+                label="📥 تنزيل كشف المراجعة الشبكي",
+                data=output.getvalue(),
+                file_name=f"كشف_المراجعة_{date.today()}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
@@ -375,7 +435,6 @@ else:
     with tab2:
         st.markdown("### 📖 تسجيل الحفظ الجديد")
 
-        # 1. إدخال وتحديد بيانات الطالب للحفظ أولاً
         selected_student_hifz = st_searchbox(
             search_students,
             placeholder="🔍 اكتب اسم الطالب أو الحرف الأول مباشرة...",
@@ -413,9 +472,9 @@ else:
 
             st.divider()
 
-            # 2. عرض السجل والرسم البياني الأنيق للطالب بعد قسم الإدخال
+            # عرض التخطيط المحسّن للطالب
             st.markdown(
-                f"#### 📊 سجل ورسم بياني لـ الطالب: *{selected_student_hifz}*"
+                f"#### 📊 سجل إنجاز الطالب: *{selected_student_hifz}*"
             )
 
             df_student_hifz = pd.read_sql_query(
@@ -425,20 +484,35 @@ else:
             )
 
             if not df_student_hifz.empty:
-                # رسم بياني محسّن ومنظم باستخدام Pandas Chart
                 rating_counts = df_student_hifz[
                     "التقييم"
                 ].value_counts().reset_index()
                 rating_counts.columns = ["التقييم", "العدد"]
 
-                st.bar_chart(
-                    data=rating_counts,
-                    x="التقييم",
-                    y="العدد",
-                    use_container_width=True,
+                # رسم بياني احترافي وجميل باستخدام Altair
+                chart = (
+                    alt.Chart(rating_counts)
+                    .mark_bar(cornerRadiusTopLeft=8, cornerRadiusTopRight=8)
+                    .encode(
+                        x=alt.X(
+                            "التقييم:N",
+                            title="نوع التقييم",
+                            axis=alt.Axis(labelAngle=0),
+                        ),
+                        y=alt.Y("العدد:Q", title="عدد المرات"),
+                        color=alt.Color(
+                            "التقييم:N",
+                            scale=alt.Scale(
+                                domain=["جيد", "إعادة"],
+                                range=["#2ec4b6", "#e71d36"],
+                            ),
+                            legend=None,
+                        ),
+                    )
+                    .properties(height=250)
                 )
 
-                # عرض جدول الحفظ السابق للطالب
+                st.altair_chart(chart, use_container_width=True)
                 st.dataframe(df_student_hifz, use_container_width=True)
             else:
                 st.info("لا توجد سجلات حفظ سابقة لهذا الطالب حتى الآن.")
