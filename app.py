@@ -97,7 +97,7 @@ if "authenticated" not in st.session_state:
 
 if not st.session_state["authenticated"]:
     st.title("🔐 تسجيل الدخول للبرنامج")
-    
+
     with st.form("login_form"):
         username_input = st.text_input("اسم المستخدم:")
         password_input = st.text_input("كلمة المرور:", type="password")
@@ -164,7 +164,7 @@ if st.session_state["role"] == "admin":
     st.sidebar.divider()
 
 # --------------------------------------------------
-# إدارة الطلاب (لليوزر الرئيسي فقط أو للجميع حسب الصلاحيات)
+# إدارة الطلاب
 # --------------------------------------------------
 st.sidebar.header("⚙️ إدارة الطلاب")
 
@@ -279,7 +279,7 @@ else:
             conn.commit()
             st.success("✅ تم حفظ الحضور بنجاح!")
 
-    # 2. الحفظ الجديد
+    # 2. الحفظ الجديد (مع العرض والرسم البياني للطالب المختار)
     with tab2:
         st.markdown("### تسجيل الحفظ الجديد")
         selected_student_hifz = st_searchbox(
@@ -291,15 +291,37 @@ else:
         if selected_student_hifz:
             st.success(f"تم اختيار الطالب: *{selected_student_hifz}*")
 
-        st.divider()
-        hifz_rating = st.radio(
-            "تقييم الحفظ:", ["جيد", "إعادة"], horizontal=True, key="hifz_rate"
-        )
+            # جلب وعرض بيانات الحفظ السابق للطالب المختار
+            df_student_hifz = pd.read_sql_query(
+                "SELECT date AS التاريخ, rating AS التقييم FROM hifz_records WHERE student_name = ? ORDER BY date DESC",
+                conn,
+                params=(selected_student_hifz,),
+            )
 
-        if st.button("حفظ التسميع 💾", key="save_hifz"):
-            if not selected_student_hifz:
-                st.error("⚠️ يرجى اختيار اسم الطالب أولاً من قائمة البحث!")
+            if not df_student_hifz.empty:
+                st.markdown(
+                    f"#### 📊 سجل حفظ الطالب السابق: *{selected_student_hifz}*"
+                )
+
+                # عرض رسم بياني لتوزيع تقييمات الطالب
+                rating_counts = df_student_hifz["التقييم"].value_counts()
+                st.bar_chart(rating_counts)
+
+                # عرض جدول البيانات لتقييمات الطالب
+                st.dataframe(df_student_hifz, use_container_width=True)
             else:
+                st.info("لا توجد سجلات حفظ سابقة لهذا الطالب.")
+
+            st.divider()
+            st.markdown("#### ➕ إضافة تسميع جديد")
+            hifz_rating = st.radio(
+                "تقييم الحفظ:",
+                ["جيد", "إعادة"],
+                horizontal=True,
+                key="hifz_rate",
+            )
+
+            if st.button("حفظ التسميع 💾", key="save_hifz"):
                 cursor.execute(
                     """
                     INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
@@ -316,6 +338,7 @@ else:
                 )
                 conn.commit()
                 st.success(f"تم حفظ تسميع الطالب ({selected_student_hifz})!")
+                st.rerun()
 
     # 3. المراجعة
     with tab3:
@@ -359,18 +382,21 @@ else:
                 st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev})!")
 
 # --------------------------------------------------
-# تصدير البيانات (متاح للجميع أو حسب الحاجة)
+# تصدير البيانات إلى Excel
 # --------------------------------------------------
 st.divider()
 st.subheader("📊 تصدير البيانات إلى ملف Excel")
 
 export_mode = st.radio(
     "اختر طريقة التصدير المطلوبة:",
-    ["تصدير جميع الطلاب (تنسيق شبكي أفقي)", "تصدير طالب محدد فقط (تقرير شخصي)"],
+    [
+        "تصدير كشف الحضور الجماعي (تنسيق شبكي أفقي)",
+        "تصدير طالب محدد فقط (تقرير شخصي كامل)",
+    ],
     horizontal=True,
 )
 
-if export_mode == "تصدير طالب محدد فقط (تقرير شخصي)":
+if export_mode == "تصدير طالب محدد فقط (تقرير شخصي كامل)":
     single_student = st.selectbox(
         "🔎 اختر اسم الطالب لتنزيل ملفه الخاص:",
         students_list,
@@ -412,6 +438,7 @@ if export_mode == "تصدير طالب محدد فقط (تقرير شخصي)":
         )
 
 else:
+    # تصدير كشف الحضور الشبكي الأفقي فقط لجميع الطلاب
     df_att_raw = pd.read_sql_query(
         "SELECT date AS التاريخ, student_name AS الطالب, status AS الحالة FROM attendance_records",
         conn,
@@ -423,50 +450,19 @@ else:
     else:
         df_att_pivot = pd.DataFrame(columns=["التاريخ"])
 
-    df_hifz_raw = pd.read_sql_query(
-        "SELECT date AS التاريخ, student_name AS الطالب, rating AS الحفظ FROM hifz_records",
-        conn,
-    )
-    if not df_hifz_raw.empty:
-        df_hifz_pivot = df_hifz_raw.pivot_table(
-            index="التاريخ", columns="الطالب", values="الحفظ", aggfunc="first"
-        ).reset_index()
-    else:
-        df_hifz_pivot = pd.DataFrame(columns=["التاريخ"])
-
-    df_rev_raw = pd.read_sql_query(
-        "SELECT date AS التاريخ, student_name AS الطالب, (amount || ' - ' || rating) AS المراجعة FROM review_records",
-        conn,
-    )
-    if not df_rev_raw.empty:
-        df_rev_pivot = df_rev_raw.pivot_table(
-            index="التاريخ", columns="الطالب", values="المراجعة", aggfunc="first"
-        ).reset_index()
-    else:
-        df_rev_pivot = pd.DataFrame(columns=["التاريخ"])
-
-    view_option = st.selectbox(
-        "اختر السجل للمعاينة قبل التنزيل:",
-        ["سجل الحضور الشبكي", "سجل الحفظ الشبكي", "سجل المراجعة الشبكي"],
-    )
-
-    if view_option == "سجل الحضور الشبكي":
-        st.dataframe(df_att_pivot)
-    elif view_option == "سجل الحفظ الشبكي":
-        st.dataframe(df_hifz_pivot)
-    else:
-        st.dataframe(df_rev_pivot)
+    st.write("##### معاينة جدول الحضور والغياب الشبكي:")
+    st.dataframe(df_att_pivot, use_container_width=True)
 
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df_att_pivot.to_excel(writer, index=False, sheet_name="سجل_الحضور")
-        df_hifz_pivot.to_excel(writer, index=False, sheet_name="سجل_الحفظ")
-        df_rev_pivot.to_excel(writer, index=False, sheet_name="سجل_المراجعة")
+        df_att_pivot.to_excel(
+            writer, index=False, sheet_name="كشف_الحضور_الشبكي"
+        )
     excel_data = output.getvalue()
 
     st.download_button(
-        label="📥 تنزيل ملف Excel الشبكي الشامل لجميع الطلاب",
+        label="📥 تنزيل ملف Excel لكشف الحضور الشبكي",
         data=excel_data,
-        file_name=f"تقرير_المركز_المجمع_{date.today()}.xlsx",
+        file_name=f"كشف_الحضور_الشبكي_{date.today()}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
