@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
-st.set_page_config(page_title="إدارة حلقة القرآن الكريم", page_icon="📖", layout="centered")
+st.set_page_config(page_title="مركز تحفيظ باب السلام", page_icon="📖", layout="centered")
 
 # القائمة الأساسية مترتبة تصاعدياً (من الفاتحة إلى النهاية)
 AHZAB_LIST = [
@@ -159,7 +159,7 @@ if "user" in st.query_params:
         st.session_state["role"] = user_data[0]
 
 if not st.session_state["authenticated"]:
-    st.markdown("<h2 style='text-align: center; color: #0f766e;'>🔐 تسجيل الدخول لبرنامج إدارة مركز التحفيظ</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #0f766e;'>🔐 تسجيل الدخول لبرنامج مركز تحفيظ باب السلام</h2>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.form("login_form"):
@@ -358,7 +358,7 @@ if st.session_state['role'] == 'admin':
 
     st.sidebar.divider()
 
-st.markdown("<h1 style='color: #0f766e; text-align: center;'>📖 برنامج إدارة مركز التحفيظ</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='color: #0f766e; text-align: center;'>📖 مركز تحفيظ باب السلام</h1>", unsafe_allow_html=True)
 
 cursor.execute("SELECT name FROM students ORDER BY name ASC")
 students_list = [row[0] for row in cursor.fetchall()]
