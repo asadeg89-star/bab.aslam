@@ -71,7 +71,7 @@ AHZAB_LIST = [
     "الفاتحة"
 ]
 
-# 2. إعداد قاعدة البيانات وتأسيس الجداول (مع تحديد UNIQUE لمنع تكرار نفس الطالب في نفس اليوم)
+# 2. إعداد قاعدة البيانات وتأسيس الجداول
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
 cursor = conn.cursor()
 
@@ -96,14 +96,12 @@ CREATE TABLE IF NOT EXISTS students (
 )
 """)
 
-# إضافة UNIQUE(date, student_name) لضمان سجل واحد لكل يوم لكل طالب
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS attendance_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     date TEXT,
     student_name TEXT,
-    status TEXT,
-    UNIQUE(date, student_name)
+    status TEXT
 )
 """)
 
@@ -115,8 +113,7 @@ CREATE TABLE IF NOT EXISTS hifz_records (
     surah TEXT,
     from_ayah INTEGER,
     to_ayah INTEGER,
-    rating TEXT,
-    UNIQUE(date, student_name)
+    rating TEXT
 )
 """)
 
@@ -126,8 +123,7 @@ CREATE TABLE IF NOT EXISTS review_records (
     date TEXT,
     student_name TEXT,
     amount TEXT,
-    rating TEXT,
-    UNIQUE(date, student_name)
+    rating TEXT
 )
 """)
 conn.commit()
@@ -312,7 +308,7 @@ else:
     tab1, tab2, tab3 = st.tabs(["📝 الحضور والغياب المجمع والتصدير", "📖 الحفظ الجديد", "🔄 المراجعة"])
 
     # --------------------------------------------------
-    # TAB 1: الحضور والغياب (مع استبدال السجل القديم بنظام INSERT OR REPLACE)
+    # TAB 1: الحضور والغياب (حذف القديم لنفس اليوم ثم إدخال الجديد)
     # --------------------------------------------------
     with tab1:
         st.markdown("### 📋 كشف الحضور والغياب الجماعي")
@@ -337,20 +333,23 @@ else:
 
         if st.button("💾 حفظ كشف الحضور لجميع الطلاب الظاهرين", type="primary"):
             for student_name, status in attendance_results.items():
-                # استخدام INSERT OR REPLACE لتحديث حالة الحضور إذا تم إدخالها مسبقاً في نفس اليوم
+                # حذف أي سجل قديم لنفس الطالب في نفس اليوم لضمان بقاء سجل واحد فقط
+                cursor.execute("DELETE FROM attendance_records WHERE date = ? AND student_name = ?", (str(entry_date), student_name))
                 cursor.execute("""
-                    INSERT OR REPLACE INTO attendance_records (date, student_name, status)
+                    INSERT INTO attendance_records (date, student_name, status)
                     VALUES (?, ?, ?)
                 """, (str(entry_date), student_name, status))
                 
                 if status in ["غياب", "غياب بعذر"]:
+                    cursor.execute("DELETE FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), student_name))
                     cursor.execute("""
-                        INSERT OR REPLACE INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
+                        INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
                         VALUES (?, ?, ?, ?, ?, ?)
                     """, (str(entry_date), student_name, "-", 0, 0, "غائب"))
                     
+                    cursor.execute("DELETE FROM review_records WHERE date = ? AND student_name = ?", (str(entry_date), student_name))
                     cursor.execute("""
-                        INSERT OR REPLACE INTO review_records (date, student_name, amount, rating)
+                        INSERT INTO review_records (date, student_name, amount, rating)
                         VALUES (?, ?, ?, ?)
                     """, (str(entry_date), student_name, "غائب", "غائب"))
                     
@@ -393,7 +392,7 @@ else:
             st.dataframe(df_pivot, use_container_width=True, hide_index=True)
 
     # --------------------------------------------------
-    # TAB 2: الحفظ الجديد (مع استبدال السجل القديم بنظام INSERT OR REPLACE)
+    # TAB 2: الحفظ الجديد (حذف القديم لنفس اليوم ثم إدخال الجديد)
     # --------------------------------------------------
     with tab2:
         st.markdown("### 📖 تسجيل الحفظ الجديد")
@@ -404,9 +403,10 @@ else:
             hifz_rating = st.radio("تقييم الحفظ اليوم:", ["جيد", "إعادة", "غائب"], horizontal=True, key="hifz_rate")
             
             if st.button("حفظ التسميع 💾", key="save_hifz", type="primary"):
-                # استبدال السجل القديم لنفس اليوم إذا أُدخل مرة أخرى
+                # حذف السجل القديم لنفس اليوم ثم إدراج الجديد ليصبح الإدخال أحدث وأوحد
+                cursor.execute("DELETE FROM hifz_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_hifz))
                 cursor.execute("""
-                    INSERT OR REPLACE INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
+                    INSERT INTO hifz_records (date, student_name, surah, from_ayah, to_ayah, rating)
                     VALUES (?, ?, ?, ?, ?, ?)
                 """, (str(entry_date), selected_student_hifz, "-", 0, 0, hifz_rating))
                 conn.commit()
@@ -443,7 +443,7 @@ else:
                 st.altair_chart((bars + text).properties(height=280), use_container_width=True)
 
     # --------------------------------------------------
-    # TAB 3: المراجعة (مع استبدال السجل القديم بنظام INSERT OR REPLACE)
+    # TAB 3: المراجعة (حذف القديم لنفس اليوم ثم إدخال الجديد)
     # --------------------------------------------------
     with tab3:
         st.markdown("### 🔄 تسجيل المراجعة")
@@ -478,9 +478,10 @@ else:
                 review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
                 
                 if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
-                    # استخدام INSERT OR REPLACE لتحديث التقييم القديم لنفس اليوم تلقائياً
+                    # حذف السجل القديم لنفس اليوم ثم إدراج الجديد لضمان بقاء سجل واحد فقط
+                    cursor.execute("DELETE FROM review_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_rev))
                     cursor.execute("""
-                        INSERT OR REPLACE INTO review_records (date, student_name, amount, rating)
+                        INSERT INTO review_records (date, student_name, amount, rating)
                         VALUES (?, ?, ?, ?)
                     """, (str(entry_date), selected_student_rev, review_hizb, review_rating))
                     conn.commit()
