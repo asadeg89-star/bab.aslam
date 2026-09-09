@@ -220,6 +220,22 @@ st.sidebar.divider()
 if st.session_state['role'] == 'admin':
     st.sidebar.markdown("### ⚙️ لوحة تحكم المدير")
     
+    with st.sidebar.expander("👨‍🏫 إدارة المعلمين (إضافة مستخدم جديد)"):
+        new_teacher_user = st.text_input("اسم المستخدم للمعلم:")
+        new_teacher_pass = st.text_input("كلمة المرور:", type="password", key="new_t_pass")
+        if st.button("➕ إضافة المعلم", use_container_width=True):
+            if new_teacher_user.strip() and new_teacher_pass.strip():
+                try:
+                    cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", 
+                                   (new_teacher_user.strip(), new_teacher_pass.strip(), "user"))
+                    conn.commit()
+                    st.success(f"تم إضافة المعلم ({new_teacher_user}) بنجاح!")
+                    st.rerun()
+                except sqlite3.IntegrityError:
+                    st.error("اسم المستخدم هذا موجود مسبقاً، اختر اسمًا آخر.")
+            else:
+                st.warning("يرجى إدخال اسم المستخدم وكلمة المرور.")
+
     with st.sidebar.expander("👥 إدارة الطلاب (إضافة / حذف)"):
         new_student = st.text_input("اسم الطالب الجديد:")
         if st.button("➕ إضافة الطالب", use_container_width=True):
@@ -602,10 +618,8 @@ else:
         if search_target_hizb:
             target_index = AHZAB_LIST.index(search_target_hizb)
             
-            # قائمة لتجميع الطلاب المفترض مراجعتهم لهذا الحزب
             expected_students_list = []
             
-            # 1. الطلاب الذين اجتازوا الحزب السابق بتقدير "جيد"
             if target_index > 0:
                 previous_hizb = AHZAB_LIST[target_index - 1]
                 query_good = f"""
@@ -627,7 +641,6 @@ else:
                         "الحزب_الحالي_المطلوب": search_target_hizb
                     })
 
-            # 2. الطلاب الذين حصلوا على "إعادة" في نفس الحزب الحالي
             query_retry = f"""
             SELECT r.student_name AS الطالب, r.date AS تاريخ_آخر_إنجاز, r.amount AS الحزب_السابق 
             FROM review_records r
@@ -640,7 +653,6 @@ else:
             """
             df_retry = pd.read_sql_query(query_retry, conn, params=(search_target_hizb,))
             for _, row in df_retry.iterrows():
-                # التأكد من عدم تكرار الطالب إذا أُضيف مسبقاً
                 if not any(d["الطالب"] == row["الطالب"] for d in expected_students_list):
                     expected_students_list.append({
                         "الطالب": row["الطالب"],
@@ -661,7 +673,6 @@ else:
 
             st.divider()
             st.markdown(f"#### 📋 السجل الفعلي لمن راجعوا حزب ({search_target_hizb}) بالفعل (الأحدث أولاً):")
-            # جلب السجل الفعلي مرتباً تنازلياً حسب معرف السجل id أو التاريخ (الأحدث في الأعلى)
             df_actual_rev = pd.read_sql_query("SELECT date AS التاريخ, student_name AS الطالب, rating AS التقييم FROM review_records WHERE amount = ? ORDER BY id DESC", conn, params=(search_target_hizb,))
             if not df_actual_rev.empty:
                 st.dataframe(df_actual_rev, use_container_width=True, hide_index=True)
