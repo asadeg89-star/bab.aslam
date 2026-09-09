@@ -545,51 +545,40 @@ else:
             else:
                 st.success(f"تم اختيار الطالب: *{selected_student_rev}*")
                 
-                # إضافة خيار "لم يسمع" كحالة سريعة مباشرة بدون الحاجة لاختيار حزب
-                quick_not_called = st.checkbox("تعيين الحالة مباشرة كـ (لم يسمع)", key="quick_not_called_box")
-                
-                if quick_not_called:
-                    if st.button("حفظ كـ (لم يسمع) 💾", key="save_rev_none", type="primary", use_container_width=True):
+                if "selected_hizb" not in st.session_state:
+                    st.session_state["selected_hizb"] = None
+                if "show_hizb_grid" not in st.session_state:
+                    st.session_state["show_hizb_grid"] = False
+
+                st.write("📖 *حزب المراجعة:*")
+                current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب (تنازلياً) 🔻"
+                if st.button(f"🟢 {current_hizb_text}", use_container_width=True, key="toggle_hizb_btn"):
+                    st.session_state["show_hizb_grid"] = not st.session_state["show_hizb_grid"]
+                    st.rerun()
+
+                if st.session_state["show_hizb_grid"]:
+                    st.info("اضغط على اسم الحزب لاختياره مباشرة (الترتيب تنازلي من النهاية للبداية):")
+                    for idx, hizb in enumerate(AHZAB_LIST_DESC):
+                        if st.button(hizb, key=f"hizb_btn_{idx}", use_container_width=True):
+                            st.session_state["selected_hizb"] = hizb
+                            st.session_state["show_hizb_grid"] = False
+                            st.rerun()
+
+                review_hizb = st.session_state["selected_hizb"]
+                if review_hizb:
+                    st.success(f"تم تحديد الحزب: *{review_hizb}*")
+                    # تم تقييد الخيارات لتكون فقط (جيد) و (إعادة)
+                    review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
+                    
+                    if st.button("حفظ المراجعة 💾", key="save_rev", type="primary", use_container_width=True):
                         cursor.execute("DELETE FROM review_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_rev))
-                        cursor.execute("INSERT INTO review_records (date, student_name, amount, rating) VALUES (?, ?, ?, ?)", (str(entry_date), selected_student_rev, "لم يسمع", "لم يسمع"))
+                        cursor.execute("INSERT INTO review_records (date, student_name, amount, rating) VALUES (?, ?, ?, ?)", (str(entry_date), selected_student_rev, review_hizb, review_rating))
                         conn.commit()
-                        st.success(f"تم تحديث مراجعة الطالب ({selected_student_rev}) إلى (لم يسمع) بنجاح!")
+                        st.success(f"تم تحديث مراجعة الطالب ({selected_student_rev}) بنجاح!")
+                        st.session_state["selected_hizb"] = None
                         st.rerun()
                 else:
-                    if "selected_hizb" not in st.session_state:
-                        st.session_state["selected_hizb"] = None
-                    if "show_hizb_grid" not in st.session_state:
-                        st.session_state["show_hizb_grid"] = False
-
-                    st.write("📖 *حزب المراجعة:*")
-                    current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب (تنازلياً) 🔻"
-                    if st.button(f"🟢 {current_hizb_text}", use_container_width=True, key="toggle_hizb_btn"):
-                        st.session_state["show_hizb_grid"] = not st.session_state["show_hizb_grid"]
-                        st.rerun()
-
-                    if st.session_state["show_hizb_grid"]:
-                        st.info("اضغط على اسم الحزب لاختياره مباشرة (الترتيب تنازلي من النهاية للبداية):")
-                        for idx, hizb in enumerate(AHZAB_LIST_DESC):
-                            if st.button(hizb, key=f"hizb_btn_{idx}", use_container_width=True):
-                                st.session_state["selected_hizb"] = hizb
-                                st.session_state["show_hizb_grid"] = False
-                                st.rerun()
-
-                    review_hizb = st.session_state["selected_hizb"]
-                    if review_hizb:
-                        st.success(f"تم تحديد الحزب: *{review_hizb}*")
-                        # تم تقييد الخيارات لتكون فقط (جيد) و (إعادة)
-                        review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
-                        
-                        if st.button("حفظ المراجعة 💾", key="save_rev", type="primary", use_container_width=True):
-                            cursor.execute("DELETE FROM review_records WHERE date = ? AND student_name = ?", (str(entry_date), selected_student_rev))
-                            cursor.execute("INSERT INTO review_records (date, student_name, amount, rating) VALUES (?, ?, ?, ?)", (str(entry_date), selected_student_rev, review_hizb, review_rating))
-                            conn.commit()
-                            st.success(f"تم تحديث مراجعة الطالب ({selected_student_rev}) بنجاح!")
-                            st.session_state["selected_hizb"] = None
-                            st.rerun()
-                    else:
-                        st.warning("⚠️ يرجى اختيار الحزب أولاً قبل حفظ المراجعة أو تفعيل خيار (لم يسمع).")
+                    st.warning("⚠️ يرجى اختيار الحزب أولاً قبل حفظ المراجعة.")
 
             st.divider()
             st.markdown(f"#### 📊 سجل مراجعة الطالب (آخر 10 نتائج): *{selected_student_rev}*")
