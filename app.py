@@ -4,12 +4,19 @@ import io
 import pandas as pd
 import streamlit as st
 import altair as alt
+import extra_streamlit_components as stx
+
+st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
+
+# --------------------------------------------------
+# إدارة الكوكيز للحفاظ على تسجيل الدخول عند تحديث الصفحة
+# --------------------------------------------------
+cookie_manager = stx.CookieManager()
 
 # 1. إعداد قاعدة البيانات وتأسيس الجداول
 conn = sqlite3.connect("quran_center.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# جدول المستخدمين للتسجيل والدخول
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -19,7 +26,6 @@ CREATE TABLE IF NOT EXISTS users (
 )
 """)
 
-# إنشاء حساب أدمن رئيسي افتراضي إذا لم يكن موجوداً
 cursor.execute("SELECT * FROM users WHERE username = 'admin'")
 if not cursor.fetchone():
     cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", ("admin", "admin123", "admin"))
@@ -64,8 +70,6 @@ CREATE TABLE IF NOT EXISTS review_records (
 """)
 conn.commit()
 
-st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
-
 # تنسيق الاتجاه RTL والجدول المخصص للهواتف
 st.markdown("""
     <style>
@@ -77,7 +81,6 @@ st.markdown("""
     section[data-testid="stSidebar"] { direction: ltr !important; }
     section[data-testid="stSidebar"] * { direction: rtl !important; text-align: right !important; }
     
-    /* تنسيق جدول HTML المخصص للهواتف */
     .custom-table {
         width: 100%;
         border-collapse: collapse;
@@ -121,12 +124,21 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --------------------------------------------------
-# نظام تسجيل الدخول وإدارة الجلسة
+# نظام تسجيل الدخول مع حفظ الجلسة في الكوكيز
 # --------------------------------------------------
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
     st.session_state["username"] = ""
     st.session_state["role"] = ""
+
+# استرجاع الجلسة من الكوكيز عند تحديث الصفحة
+cookie_user = cookie_manager.get(cookie="auth_user")
+cookie_role = cookie_manager.get(cookie="auth_role")
+
+if cookie_user and cookie_role and not st.session_state["authenticated"]:
+    st.session_state["authenticated"] = True
+    st.session_state["username"] = cookie_user
+    st.session_state["role"] = cookie_role
 
 if not st.session_state["authenticated"]:
     st.title("🔐 تسجيل الدخول للبرنامج")
@@ -144,6 +156,11 @@ if not st.session_state["authenticated"]:
                 st.session_state["authenticated"] = True
                 st.session_state["username"] = username_input.strip()
                 st.session_state["role"] = user_match[0]
+                
+                # حفظ بيانات الجلسة في الكوكيز لمدة 7 أيام
+                cookie_manager.set("auth_user", username_input.strip(), key="set_user", expires_at=date.fromordinal(date.today().toordinal() + 7))
+                cookie_manager.set("auth_role", user_match[0], key="set_role", expires_at=date.fromordinal(date.today().toordinal() + 7))
+                
                 st.success("تم تسجيل الدخول بنجاح!")
                 st.rerun()
             else:
@@ -160,6 +177,10 @@ if st.sidebar.button("🚪 تسجيل الخروج"):
     st.session_state["authenticated"] = False
     st.session_state["username"] = ""
     st.session_state["role"] = ""
+    
+    # مسح الكوكيز عند تسجيل الخروج
+    cookie_manager.delete("auth_user")
+    cookie_manager.delete("auth_role")
     st.rerun()
 
 st.sidebar.divider()
@@ -368,7 +389,6 @@ else:
     with tab2:
         st.markdown("### 📖 تسجيل الحفظ الجديد")
         
-        # استخدام st.selectbox المدمجة لعرض جميع الأسماء مباشرة والبحث عند الكتابة
         selected_student_hifz = st.selectbox(
             "🔍 اختر اسم الطالب أو اكتب للبحث:",
             students_list,
@@ -395,14 +415,12 @@ else:
 
             st.markdown(f"#### 📊 سجل إنجاز الطالب (آخر 10 نتائج): *{selected_student_hifz}*")
 
-            # جلب آخر 10 سجلات فقط مرتبة من الأحدث إلى الأقدم بحسب التاريخ
             df_student_hifz = pd.read_sql_query(
                 "SELECT date AS التاريخ, rating AS التقييم FROM hifz_records WHERE student_name = ? ORDER BY date DESC, id DESC LIMIT 10",
                 conn, params=(selected_student_hifz,)
             )
 
             if not df_student_hifz.empty:
-                # جدول HTML مخصص بدون مشاكل اقتطاع الشاشة
                 html_table = "<table class='custom-table'><thead><tr><th>التاريخ</th><th>التقييم</th></tr></thead><tbody>"
                 for _, row in df_student_hifz.iterrows():
                     badge = "badge-good" if row['التقييم'] == "جيد" else "badge-retry"
@@ -413,7 +431,6 @@ else:
 
                 st.divider()
 
-                # الرسم البياني لآخر 10 نتائج
                 rating_counts = df_student_hifz['التقييم'].value_counts().reset_index()
                 rating_counts.columns = ['التقييم', 'العدد']
 
