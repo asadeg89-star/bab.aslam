@@ -7,68 +7,18 @@ import altair as alt
 
 st.set_page_config(page_title="إدارة حلقة القرآن", page_icon="📖", layout="centered")
 
-# 1. إعداد قائمة أسماء الأحزاب فقط
+# 1. إعداد قائمة أسماء الأحزاب
 AHZAB_LIST = [
-    "الأعلى",
-    "النبأ",
-    "الجن",
-    "الملك",
-    "الجمعة",
-    "المجادلة",
-    "الرحمن",
-    "قال فما خطبكم",
-    "لقد رضي",
-    "الأحقاف",
-    "قل أولو جئتكم",
-    "إليه يرد",
-    "وبقوم مالي",
-    "فمن أظلم",
-    "فنبذناه",
-    "وما أنزلنا",
-    "قل من يرزقكم",
-    "إن المسلمين",
-    "ومن يسلم",
-    "ولا تجادلوا",
-    "ولقد وصلنا",
-    "قل الحمد لله",
-    "قالوا أأنؤمن",
-    "وقال الذين لا يرجون",
-    "يأيها الذين آمنوا",
-    "المؤمنون",
-    "الحج",
-    "الأنبيائ",
-    "طه",
-    "قال ألم أقل لك",
-    "أولم يَرَوْا",
-    "سبحان الذي",
-    "وقال الله",
-    "الحجر",
-    "أمن يعلم",
-    "وما أبرئ",
-    "وإلى مدين",
-    "وما من دابة",
-    "الذين أحسنوا",
-    "إنما السبيل",
-    "يأيها الذين آمنوا",
-    "واعلموا",
-    "وإذ نتقنا",
-    "قال الملأ",
-    "الأعراف",
-    "ولو أننا نزلنا",
-    "إنما يستجيب",
-    "لتجدن",
-    "قال رجلان",
-    "لا يحب",
-    "الله لا إله إلا هو",
-    "المحصنات",
-    "يستبشرون",
-    "لن تنالوا",
-    "قل أؤنبئكم",
-    "تلك الرسل",
-    "واذكروا الله",
-    "سيقول",
-    "وإذا لقوا",
-    "الفاتحة"
+    "الأعلى", "النبأ", "الجن", "الملك", "الجمعة", "المجادلة",
+    "الرحمن", "قال فما خطبكم", "لقد رضي", "الأحقاف", "قل أولو جئتكم", "إليه يرد",
+    "وبقوم مالي", "فمن أظلم", "فنبذناه", "وما أنزلنا", "قل من يرزقكم", "إن المسلمين",
+    "ومن يسلم", "ولا تجادلوا", "ولقد وصلنا", "قل الحمد لله", "قالوا أأنؤمن", "وقال الذين لا يرجون",
+    "يأيها الذين آمنوا", "المؤمنون", "الحج", "الأنبيائ", "طه", "قال ألم أقل لك",
+    "أولم يَرَوْا", "سبحان الذي", "وقال الله", "الحجر", "أمن يعلم", "وما أبرئ",
+    "وإلى مدين", "وما من دابة", "الذين أحسنوا", "إنما السبيل", "يأيها الذين آمنوا", "واعلموا",
+    "وإذ نتقنا", "قال الملأ", "الأعراف", "ولو أننا نزلنا", "إنما يستجيب", "لتجدن",
+    "قال رجلان", "لا يحب", "الله لا إله إلا هو", "المحصنات", "يستبشرون", "لن تنالوا",
+    "قل أؤنبئكم", "تلك الرسل", "واذكروا الله", "سيقول", "وإذا لقوا", "الفاتحة"
 ]
 
 # 2. إعداد قاعدة البيانات وتأسيس الجداول
@@ -128,7 +78,7 @@ CREATE TABLE IF NOT EXISTS review_records (
 """)
 conn.commit()
 
-# تنسيق الاتجاه RTL وتحسين شكل الجداول
+# تنسيق الاتجاه RTL وتنسيق الجدول
 st.markdown("""
     <style>
     .stMainBlockContainer { direction: rtl !important; text-align: right !important; }
@@ -514,7 +464,7 @@ else:
                 st.info("لا توجد سجلات حفظ سابقة لهذا الطالب حتى الآن.")
 
     # --------------------------------------------------
-    # TAB 3: المراجعة (قائمة منسدلة تُغلق فور الاختيار)
+    # TAB 3: المراجعة (بدون كيبورد وبدون قائمة تظل مفتوحة)
     # --------------------------------------------------
     with tab3:
         st.markdown("### 🔄 تسجيل المراجعة")
@@ -529,24 +479,51 @@ else:
         if selected_student_rev:
             st.success(f"تم اختيار الطالب: *{selected_student_rev}*")
 
-            # اختيار الحزب عبر قائمة منسدلة تغلق فوراً بمجرد اللمس
-            review_hizb = st.selectbox(
-                "📖 اختر حزب المراجعة:",
-                AHZAB_LIST,
-                index=0,
-                key="rev_hizb_select"
-            )
+            # تهيئة متغير الحزب المختار في الجلسة
+            if "selected_hizb" not in st.session_state:
+                st.session_state["selected_hizb"] = None
+            if "show_hizb_grid" not in st.session_state:
+                st.session_state["show_hizb_grid"] = False
+
+            st.write("📖 *حزب المراجعة:*")
             
-            review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
-            
-            if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
-                cursor.execute("""
-                    INSERT INTO review_records (date, student_name, amount, rating)
-                    VALUES (?, ?, ?, ?)
-                """, (str(entry_date), selected_student_rev, review_hizb, review_rating))
-                conn.commit()
-                st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev}) بنجاح!")
+            # زر إظهار شبكة الأحزاب
+            current_hizb_text = st.session_state["selected_hizb"] if st.session_state["selected_hizb"] else "اضغط هنا لاختيار الحزب 🔻"
+            if st.button(f"🟢 {current_hizb_text}", use_container_width=True, key="toggle_hizb_btn"):
+                st.session_state["show_hizb_grid"] = not st.session_state["show_hizb_grid"]
                 st.rerun()
+
+            # عرض قائمة الأحزاب على شكل أزرار شبكية عند النقر
+            if st.session_state["show_hizb_grid"]:
+                st.info("اضغط على اسم الحزب لاختياره مباشرة:")
+                cols = st.columns(3) # عرض الأحزاب في 3 أعمدة
+                for idx, hizb in enumerate(AHZAB_LIST):
+                    col = cols[idx % 3]
+                    if col.button(hizb, key=f"hizb_btn_{idx}", use_container_width=True):
+                        st.session_state["selected_hizb"] = hizb
+                        st.session_state["show_hizb_grid"] = False # إغلاق القائمة فوراً
+                        st.rerun()
+
+            review_hizb = st.session_state["selected_hizb"]
+            
+            if review_hizb:
+                st.success(f"تم تحديد الحزب: *{review_hizb}*")
+                
+                review_rating = st.radio("تقييم المراجعة اليوم:", ["جيد", "إعادة"], horizontal=True, key="rev_rate")
+                
+                if st.button("حفظ المراجعة 💾", key="save_rev", type="primary"):
+                    cursor.execute("""
+                        INSERT INTO review_records (date, student_name, amount, rating)
+                        VALUES (?, ?, ?, ?)
+                    """, (str(entry_date), selected_student_rev, review_hizb, review_rating))
+                    conn.commit()
+                    st.success(f"تم حفظ مراجعة الطالب ({selected_student_rev}) بنجاح!")
+                    
+                    # إعادة ضبط اختيار الحزب للمرة القادمة
+                    st.session_state["selected_hizb"] = None
+                    st.rerun()
+            else:
+                st.warning("⚠️ يرجى اختيار الحزب أولاً قبل حفظ المراجعة.")
 
             st.divider()
 
