@@ -1,5 +1,7 @@
+
 streamlit
 pandas
 openpyxl
 altair
-
+gspread
+oauth2client
