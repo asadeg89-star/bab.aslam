@@ -1,5 +1,6 @@
 from datetime import date
 import io
+import json
 import pandas as pd
 import streamlit as st
 import altair as alt
@@ -24,15 +25,20 @@ AHZAB_LIST = [
 
 AHZAB_LIST_DESC = list(reversed(AHZAB_LIST))
 
-# --- الاتصال بجداول جوجل (Google Sheets) ---
+# --- الاتصال بجداول جوجل (Google Sheets) المعدل ليعمل بسلاسة ---
 @st.cache_resource
 def init_google_sheets():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    # قراءة بيانات الاعتماد من أسرار Streamlit (Secrets)
+    
+    # تحويل الـ secrets إلى قاموس (Dictionary) بشكل آمن
     creds_dict = dict(st.secrets["gcp_service_account"])
+    
+    # التصحيح التلقائي لمفتاح الـ Private Key في حال وجود مشكلة في الأسطر الجديدة
+    if "private_key" in creds_dict:
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+        
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    # افتح ملف السبريدشيت باسم "QuranCenterDB"
     spreadsheet = client.open("QuranCenterDB")
     return spreadsheet
 
