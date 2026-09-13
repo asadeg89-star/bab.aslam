@@ -19,14 +19,22 @@ def connect_to_sheets():
         creds_dict = json.loads(json_str)
       else:
         creds_dict = dict(st.secrets["gcp_service_account"])
-        if "private_key" in creds_dict:
-          creds_dict["private_key"] = creds_dict["private_key"].replace(
-              "\\n", "\n"
-          )
     else:
       raise ValueError("لم يتم العثور على إعدادات gcp_service_account في Secrets")
 
-    # استخدام الدالة الصحيحة للتعامل مع البيانات مباشرة كـ Dictionary
+    # --- الحل الجذري لإصلاح صيغة الـ private_key ---
+    if "private_key" in creds_dict:
+      # تحويل الرموز النصية للسطر الجديد إلى أسطر حقيقية
+      creds_dict["private_key"] = (
+          creds_dict["private_key"].replace("\\n", "\n").strip()
+      )
+      # إزالة أي علامات تنصيص إضافية قد تكون علقت بالغلط
+      if creds_dict["private_key"].startswith(
+          '"'
+      ) and creds_dict["private_key"].endswith('"'):
+        creds_dict["private_key"] = creds_dict["private_key"][1:-1]
+
+    # استخدام البيانات المصححة لإنشاء الاعتماد
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     client = gspread.authorize(creds)
     return client
