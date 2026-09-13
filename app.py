@@ -1,37 +1,36 @@
 import pandas as pd
 import streamlit as st
 
-# رابط جوجل شيت الخاص بك
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1BB4CAm4M1tQN74s5whI8M0-GiT5tjS0i8Aw3n31B1pY/edit?usp=drivesdk"
+# استخراج معرف الملف (ID) مباشرة من الرابط الخاص بك بطريقة مضمونة
+SHEET_ID = "1BB4CAm4M1tQN74s5whI8M0-GiT5tjS0i8Aw3n31B1pY"
+# بناء رابط تصدير الـ CSV الصحيح للعموم
+CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
 
-@st.cache_data(ttl=600)  # تخزين مؤقت للبيانات لتسريع التطبيق وحفظها
-def load_data_from_sheet(url):
+@st.cache_data(ttl=600)
+def load_data():
   try:
-    # تحويل رابط الشيت إلى رابط تصدير بصيغة CSV ليتم قراءته مباشرة وبسهولة تامة
-    csv_url = url.replace("/edit?usp=drivesdk", "/export?format=csv")
-    df = pd.read_csv(csv_url)
+    df = pd.read_csv(CSV_URL)
     return df
   except Exception as e:
-    st.error(f"حدث خطأ أثناء جلب البيانات: {e}")
-    return None
+    # سنتأكد من إظهار سبب الخطأ بدقة لنعرف هل هو بسبب الصلاحيات أم لا
+    return str(e)
 
 
 st.title("تطبيق القرآن الكريم والأحزاب")
-st.write("جاري جلب البيانات بأمان واحترافية...")
 
-# تحميل وعرض البيانات
-df = load_data_from_sheet(SHEET_URL)
+# محاولة جلب البيانات
+result = load_data()
 
-if df is not None and not df.empty:
-  st.success("تم الاتصال بنجاح وقراءة البيانات من Google Sheets!")
-
-  # عرض البيانات في جدول تفاعلي
-  st.dataframe(df)
-
-  # يمكنك البدء في استخدام البيانات هنا (مثلاً البحث أو عرض سور/أحزاب معينة)
+if isinstance(result, pd.DataFrame):
+  if not result.empty:
+    st.success("تم الاتصال بنجاح وقراءة بيانات القرآن الكريم والأحزاب!")
+    st.dataframe(result)
+  else:
+    st.warning("الملف فارغ ولا يحتوي على بيانات حالياً.")
 else:
-  st.warning(
-      "لم يتم العثور على بيانات، يجدر التأكد من أن الرابط عام (Anyone with the"
-      " link can view)."
+  st.error(f"خطأ في الصلاحيات أو الرابط: {result}")
+  st.info(
+      "ملاحظة هامة: تأكد من أن الملف في جوجل شيت مضبوط على 'Anyone with the link'"
+      " (أي شخص لديه الرابط يمكنه العرض)."
   )
