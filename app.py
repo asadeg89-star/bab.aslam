@@ -1,4 +1,3 @@
-import base64
 import json
 import gspread
 import streamlit as st
@@ -13,17 +12,22 @@ SCOPES = [
 @st.cache_resource
 def connect_to_sheets():
   try:
-    # قراءة المفتاح وتطهيره من أي رمز غريب أو نقطة قد تكون لصقت بالخطأ
-    private_key_raw = st.secrets["gcp_service_account"]["private_key"]
+    raw_key = st.secrets["gcp_service_account"]["private_key"]
 
-    # تنظيف أي رموز غير مرغوب فيها وتصحيح الأسطر
-    clean_key = private_key_raw.strip().replace('"', "").replace("'", "")
+    # تنظيف جذري لأي نقطة أو فراغات في بداية أو نهاية المفتاح
+    clean_key = str(raw_key).strip().lstrip(".")
+
+    # إصلاح تنسيق الأسطر لو كانت مخزنة بطريقة خاطئة
+    if "\\n" in clean_key and "\n" not in clean_key:
+      clean_key = clean_key.replace("\\n", "\n")
+
+    # التأكد من أن المفتاح يبدأ بالشكل الصحيح تماماً
     if "BEGIN PRIVATE KEY" in clean_key and not clean_key.startswith(
         "-----BEGIN PRIVATE KEY-----"
     ):
-      clean_key = "-----BEGIN PRIVATE KEY-----" + clean_key.split("-----BEGIN PRIVATE KEY-----")[1]
-    
-    clean_key = clean_key.replace("\\n", "\n")
+      parts = clean_key.split("-----BEGIN PRIVATE KEY-----")
+      if len(parts) > 1:
+        clean_key = "-----BEGIN PRIVATE KEY-----" + parts[1]
 
     creds_dict = {
         "type": "service_account",
