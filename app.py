@@ -1,3 +1,4 @@
+import io
 import json
 import gspread
 import streamlit as st
@@ -12,20 +13,27 @@ SCOPES = [
 @st.cache_resource
 def connect_to_sheets():
   try:
-    # جلب إعدادات الـ Secrets كاملة
-    secrets_dict = dict(st.secrets["gcp_service_account"])
+    # جلب النص الكامل للـ JSON من الـ Secrets الذي قمت بإضافته للتو
+    if "gcp_service_account" in st.secrets:
+      if "json_key" in st.secrets["gcp_service_account"]:
+        json_str = st.secrets["gcp_service_account"]["json_key"]
+        creds_dict = json.loads(json_str)
+      else:
+        # طريقة احتياطية قديمة
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        if "private_key" in creds_dict:
+          creds_dict["private_key"] = creds_dict["private_key"].replace(
+              "\\n", "\n"
+          )
+    else:
+      raise ValueError("لم يتم العثور على إعدادات gcp_service_account في Secrets")
 
-    # التأكد من إصلاح أي مشاكل في صيغة الـ private_key
-    private_key = secrets_dict.get("private_key", "")
-    # معالجة الأسطر والمسافات الزائدة لضمان توافق المفتاح مع نظام التشفير
-    private_key = private_key.replace("\\n", "\n")
-    if not private_key.startswith("-----BEGIN PRIVATE KEY-----"):
-      # إذا لم تبدأ بالشكل الصحيح، نقوم بتنظيفها
-      private_key = private_key.strip('"').strip("'")
+    # تحويل البيانات إلى ملف بايتات وهمي لتجاوز خطأ التشفير نهائياً
+    creds_file_bytes = io.BytesIO(json.dumps(creds_dict).encode("utf-8"))
 
-    secrets_dict["private_key"] = private_key
-
-    creds = Credentials.from_service_account_info(secrets_dict, scopes=SCOPES)
+    creds = Credentials.from_service_account_file(
+        creds_file_bytes, scopes=SCOPES
+    )
     client = gspread.authorize(creds)
     return client
 
