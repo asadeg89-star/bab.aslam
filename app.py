@@ -12,9 +12,15 @@ SCOPES = [
 @st.cache_resource
 def connect_to_sheets():
   try:
-    # قراءة بيانات السيرفيس أكونت مباشرة كـ Dictionary من إعدادات Streamlit Secrets
-    # تأكد أن المفتاح في الـ Secrets مطابق تماماً (مثلاً gcp_service_account)
+    # جلب بيانات الـ Secrets كـ Dictionary
     creds_dict = dict(st.secrets["gcp_service_account"])
+
+    # الحل الأكيد لمشكلة قراءة المفتاح الخاص والرموز الخاصة
+    if "private_key" in creds_dict:
+      # تصحيح أي مشاكل في الأسطر الجديدة للـ Private Key
+      creds_dict["private_key"] = creds_dict["private_key"].replace(
+          "\\n", "\n"
+      )
 
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     client = gspread.authorize(creds)
